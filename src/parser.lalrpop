@@ -1,0 +1,108 @@
+use func_lang::ast::*;
+
+grammar;
+
+pub Prog: Prog = {
+    <stmt: Stmt*> => Prog(stmt)
+}
+
+pub Stmt: Stmt = {
+    <func: FuncIdent> => Stmt::FuncIdent(func),
+    <var: VarIdent> ";" => Stmt::VarIdent(var),
+    <expr: Expr> ";" => Stmt::Expr(Box::new(expr)),
+};
+
+FuncIdent: FuncIdent = {
+    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" <body: FuncBody>
+        => FuncIdent::new_wo_rty(&id, args, Some(body)),
+    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" "->" <rtype: Type> <body: FuncBody>
+        => FuncIdent::new_w_rty(&id, args, rtype, Some(body)),
+};
+
+Arg: (String, String) = {
+    <id: Ident> ":" <ty: Type> => (id, ty)
+};
+
+FuncBody: FuncBody = {
+    "{" <stmt: Stmt*> "}" => FuncBody::new(stmt),
+};
+
+VarIdent: VarIdent = {
+    "let" <id: Ident> "=" <expr: Expr> => VarIdent::new(&id, expr),
+};
+
+pub Expr: Expr = {
+    <id: Ident> => Expr::Ident(id),
+    <int: Integer> => Expr::Integer(int),
+    <float: Float> => Expr::Float(float),
+    <bool: Bool> => Expr::Bool(bool),
+    <string: StringLit> => Expr::StringLit(string),
+    <call: CallExpr> => Expr::Call(call),
+    <array: Array> => Expr::Array(array),
+    <dict: Dictionary> => Expr::Dictionary(dict),
+};
+
+CallExpr: CallExpr = {
+    <id: Ident> "(" <args: Comma<Expr>> ")" => CallExpr::new(id, args),
+};
+
+// Типы возвращаемых значений и переменных
+pub Type: String = {
+    "void" => "void".to_string(),
+    "int" => "int".to_string(),
+    "string" => "string".to_string(),
+    "float" => "float".to_string(),
+};
+
+// Идентификатор
+pub Ident: String = {
+    <id:r"[a-zA-Z_][a-zA-Z0-9_]*"> => id.to_string(),
+};
+
+// Целые числа
+pub Integer: i64 = {
+    <int:r"-?[0-9]+"> => int.parse().unwrap(),
+};
+
+// Числа с плавающей точкой
+pub Float: f64 = {
+    <float:r"-?[0-9]+\.[0-9]+"> => float.parse().unwrap(),
+};
+
+// Булевы значения
+pub Bool: bool = {
+    "true" => true,
+    "false" => false,
+};
+
+// Строковые литералы
+pub StringLit: String = {
+    <s:r#""([^"\\]|\\.)*""#> => s[1..s.len()-1].to_string(),
+};
+
+// Комма-сепаратор для списков
+Comma<T>: Vec<T> = {
+    <item: T> "," <rest: Comma<T>> => {
+        let mut v = vec![item];
+        v.extend(rest);
+        v
+    },
+    <item: T> => vec![item],
+    => vec![]
+};
+
+// Массив значений
+pub Array: Vec<Expr> = {
+    "[" <items:Comma<Expr>> "]" => items,
+};
+
+// Словарь (ключи — строки, значения — любые выражения)
+pub Dictionary: Vec<(Expr, Expr)> = {
+    "{" <entries:Comma<Entry>> "}" => entries,
+};
+
+// Отдельная пара ключ-значение в словаре
+Entry: (Expr, Expr) = {
+    <key:StringLit> ":" <value:Expr> => (Expr::StringLit(key), value),
+    <key:Ident> ":" <value:Expr> => (Expr::Ident(key), value)
+};

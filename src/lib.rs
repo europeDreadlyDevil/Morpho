@@ -1,6 +1,7 @@
-use crate::ast::{Expr, FuncBody, Prog, Stmt, VarIdent};
+use crate::ast::{Expr, FuncBody, FuncIdent, Prog, Stmt, VarIdent};
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::fmt::{write, Display, Formatter};
+use anyhow::{Error, Result};
 use std::sync::{Arc, Mutex};
 use lalrpop_util::lalrpop_mod;
 
@@ -8,9 +9,10 @@ lalrpop_mod!(pub parser);
 
 pub mod ast;
 
-pub fn eval_program(prog: Prog) {
-    let prog = Program::new(prog);
-    prog.run()
+pub fn eval_program(prog: Prog) -> Result<()> {
+    let prog = Program::new(prog)?;
+    prog.run();
+    Ok(())
 }
 
 struct Program {
@@ -18,16 +20,17 @@ struct Program {
 }
 
 impl Program {
-    pub(crate) fn run(self) {
-        self.env.main_function.clone().run(&self.env);
+    pub(crate) fn run(mut self) {
+        let mut main_func = self.env.main_function.clone();
+        main_func.run(&mut self.env);
     }
 }
 
 impl Program {
-    pub fn new(prog: Prog) -> Self {
+    pub fn new(prog: Prog) -> Result<Self> {
         let mut global_stmts: HashMap<String, Value> = HashMap::new();
         
-        global_stmts.insert("print".into(), Value::Func(print));
+        global_stmts.insert("print".into(), Value::FuncPtr(print));
         
         let mut extracted_functions: HashMap<String, Function> = HashMap::new();
 
@@ -36,13 +39,26 @@ impl Program {
                 extracted_functions.insert(ident, func);
             }
         }
-        
-        Self {
-            env: Environment::new(
-                extracted_functions.get("main").unwrap().clone(),
-                global_stmts,
-            ),
+
+        for (ident, func) in extracted_functions {
+            global_stmts.insert(ident, Value::Func(func));
         }
+        
+        
+        if let Some(main_func) = if let Some(main_func) = global_stmts.get("main") {
+            if let crate::Value::Func(main_func) = main_func {
+                Some(main_func.clone())
+            } else { None }
+        } else { None } {
+            return Ok(Self {
+                env: Environment::new(
+                    main_func,
+                    global_stmts,
+                ),
+            })
+        }
+        
+        Err(Error::msg("main func not found"))
     }
 }
 
@@ -82,7 +98,7 @@ impl Environment {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 struct LocalEnvironment {
     variables: HashMap<String, Value>,
 }
@@ -95,12 +111,27 @@ impl LocalEnvironment {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Value {
     String(String),
     Int(i64),
-    Func(fn(Vec<Value>)),
+    FuncPtr(fn(Vec<Value>)),
+    Func(Function),
+    Type(String),
     None,
+}
+
+impl Value {
+    pub(crate) fn into_type(self) -> Value {
+        match self {
+            Value::String(_) => Value::Type("string".into()),
+            Value::Int(_) => Value::Type("int".into()),
+            Value::FuncPtr(func) => Value::Type(format!("{:?}", func)),
+            Value::Func(Function{rty, ..}) => Value::Type(rty),
+            Value::Type(ty) => Value::Type(ty),
+            Value::None => Value::Type("none".into())
+        }
+    }
 }
 
 impl Display for Value {
@@ -108,13 +139,15 @@ impl Display for Value {
         match self {
             Value::String(s) => write!(f, "{s}"),
             Value::Int(i) => write!(f, "{i}"),
-            Value::Func(func) => write!(f, "{:?}", func),
+            Value::Func(func) => write!(f, "{}", func.ident),
             Value::None => write!(f, "None"),
+            Value::FuncPtr(func_ptr) => write!(f, "{:?}", func_ptr),
+            Value::Type(ty) => write!(f, "{}", ty)
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 struct Function {
     function_fields: HashMap<String, Value>,
     environment: LocalEnvironment,
@@ -125,7 +158,7 @@ struct Function {
 }
 
 impl Function {
-    pub(crate) fn run(&mut self, g_env: &Environment) {
+    pub(crate) fn run(&mut self, g_env: &mut Environment) {
         for stmt in self.body.clone() {
             match stmt {
                 Stmt::Expr(expr) => match *expr { 
@@ -136,8 +169,20 @@ impl Function {
                         for arg in args {
                             parsed_args.push(eval_expr(arg, &self.environment));
                         }
-                        match g_env.global_stmts.get(&ident).unwrap() {
-                            Value::Func(func) => func(parsed_args),
+                        match g_env.global_stmts.clone().get_mut(&ident).unwrap() {
+                            Value::FuncPtr(func) => func(parsed_args),
+                            Value::Func(ref mut func) => {
+                                let mut l_env = LocalEnvironment::new();
+                                for i in 0..func.args.len() {
+                                    let (ident, ty) = func.args[i].clone();
+                                    if Value::Type(ty) == parsed_args[i].clone().into_type() {
+                                        l_env.variables.insert(ident, parsed_args[i].clone());
+                                    }
+                                    else { panic!("Expected other type") }
+                                }
+                                func.environment = l_env;
+                                func.run(g_env)
+                            }
                             _ => {}
                         }
                         

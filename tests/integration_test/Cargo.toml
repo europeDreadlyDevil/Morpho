@@ -6,3 +6,6 @@ edition = "2021"
 [dependencies]
 func_lang = {path = "../../"}
 anyhow = "1.0.90"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tracing-log = "0.2.0"

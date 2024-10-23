@@ -1,2 +1,3 @@
 /target
 .idea
+tests/integration_test/target

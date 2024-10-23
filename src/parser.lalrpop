@@ -1,4 +1,4 @@
-use func_lang::ast::*;
+use crate::ast::*;
 
 grammar;
 
@@ -52,6 +52,7 @@ pub Type: String = {
     "int" => "int".to_string(),
     "string" => "string".to_string(),
     "float" => "float".to_string(),
+    <ty: Ident> => ty
 };
 
 // Идентификатор

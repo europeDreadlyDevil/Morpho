@@ -104,8 +104,8 @@ impl FuncBody {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct VarIdent {
-    ident: String,
-    expr: Expr, // Теперь выражение вместо Stmt
+    pub ident: String,
+    pub expr: Expr, // Теперь выражение вместо Stmt
 }
 
 impl VarIdent {

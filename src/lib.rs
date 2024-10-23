@@ -1,6 +1,10 @@
-use crate::ast::{Expr, FuncBody, Prog, Stmt};
+use crate::ast::{Expr, FuncBody, Prog, Stmt, VarIdent};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::sync::{Arc, Mutex};
+use lalrpop_util::lalrpop_mod;
+
+lalrpop_mod!(pub parser);
 
 pub mod ast;
 
@@ -15,7 +19,7 @@ struct Program {
 
 impl Program {
     pub(crate) fn run(self) {
-        self.env.main_function.run(&self.env);
+        self.env.main_function.clone().run(&self.env);
     }
 }
 
@@ -96,7 +100,7 @@ enum Value {
     String(String),
     Int(i64),
     Func(fn(Vec<Value>)),
-    None
+    None,
 }
 
 impl Display for Value {
@@ -105,7 +109,7 @@ impl Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Int(i) => write!(f, "{i}"),
             Value::Func(func) => write!(f, "{:?}", func),
-            Value::None => write!(f, "None")
+            Value::None => write!(f, "None"),
         }
     }
 }
@@ -121,7 +125,7 @@ struct Function {
 }
 
 impl Function {
-    pub(crate) fn run(&self, g_env: &Environment) {
+    pub(crate) fn run(&mut self, g_env: &Environment) {
         for stmt in self.body.clone() {
             match stmt {
                 Stmt::Expr(expr) => match *expr { 
@@ -130,28 +134,31 @@ impl Function {
                         let args = call_expr.get_args();
                         let mut parsed_args: Vec<Value> = vec![];
                         for arg in args {
-                            parsed_args.push(eval_expr(arg));
+                            parsed_args.push(eval_expr(arg, &self.environment));
                         }
                         match g_env.global_stmts.get(&ident).unwrap() {
-                            Value::String(_) => {}
-                            Value::Int(_) => {}
                             Value::Func(func) => func(parsed_args),
-                            Value::None => {}
+                            _ => {}
                         }
                         
                     },
                     _ => panic!("Unhandled expression")
                 },
+                Stmt::VarIdent(VarIdent{ ident, expr }) => {
+                    let value = eval_expr(expr, &self.environment);
+                    self.environment.variables.insert(ident, value);
+                }
                 _ => panic!("Unhandled statement")
             }
         }
     }
 }
 
-fn eval_expr(expr: Expr) -> Value {
+fn eval_expr(expr: Expr, env: &LocalEnvironment) -> Value {
     match expr {
         Expr::Integer(i) => Value::Int(i),
         Expr::StringLit(s) => Value::String(s),
+        Expr::Ident(ident) => env.variables.get(&ident).unwrap().clone(),
         _ => Value::None
     }
 }
@@ -181,5 +188,5 @@ fn print(items: Vec<Value>) {
     for i in 0..items.len()-1 {
         print!("{} ", items[i]);
     }
-    print!("{}", items[items.len()-1])
+    println!("{}", items[items.len()-1])
 }

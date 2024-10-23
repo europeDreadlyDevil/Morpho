@@ -4,3 +4,10 @@ func main = () -> void {
     print("Hello, world!");
 }
 ```
+
+```
+func main = () { 
+    let x = "Hello, world!"; 
+    print(x); 
+}
+```

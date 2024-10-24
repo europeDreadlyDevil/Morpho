@@ -10,7 +10,15 @@ pub enum Expr {
     StringLit(String),
     Array(Vec<Expr>),
     Dictionary(Vec<(Expr, Expr)>),
-    Call(CallExpr), // Вызов функции
+    Call(CallExpr),
+    Add(Box<Expr>, Box<Expr>),
+    Sub(Box<Expr>, Box<Expr>),
+    Mul(Box<Expr>, Box<Expr>),
+    Div(Box<Expr>, Box<Expr>),
+    Eq(Box<Expr>, Box<Expr>),
+    NotEq(Box<Expr>, Box<Expr>),
+    Func(FuncPtr),
+    Range((i64, i64))
 }
 
 impl PartialEq for Expr {
@@ -27,11 +35,31 @@ impl PartialEq for Expr {
             (Expr::Array(a), Expr::Array(b)) => a == b,
             (Expr::Dictionary(a), Expr::Dictionary(b)) => a == b,
             (Expr::Call(a), Expr::Call(b)) => a == b,
+            (Expr::Add(a, b), Expr::Add(c,d)) => a == c && b == d,
+            (Expr::Sub(a, b), Expr::Sub(c,d)) => a == c && b == d,
+            (Expr::Mul(a, b), Expr::Mul(c,d)) => a == c && b == d,
+            (Expr::Div(a, b), Expr::Div(c,d)) => a == c && b == d,
+            (Expr::Eq(a, b), Expr::Eq(c,d)) => a == c && b == d,
+            (Expr::NotEq(a, b), Expr::NotEq(c,d)) => a == c && b == d,
             _ => false,
         }
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct FuncPtr {
+    pub ident: String,
+    pub args: Option<Vec<Expr>>
+}
+
+impl FuncPtr {
+    pub fn new(ident: &str, args: Option<Vec<Expr>>) -> Self {
+        Self {
+            ident: ident.into(),
+            args,
+        }
+    }
+}
 #[derive(PartialEq, Debug, Clone)]
 pub struct CallExpr {
     func_name: String,
@@ -61,7 +89,7 @@ pub enum Stmt {
 #[derive(PartialEq, Debug, Clone)]
 pub struct FuncIdent {
     pub ident: String,
-    pub args: Vec<(String, String)>, // список аргументов
+    pub args: Vec<(String, String)>,
     pub rty: String,
     pub stmt: Option<FuncBody>,
 }
@@ -105,7 +133,7 @@ impl FuncBody {
 #[derive(PartialEq, Debug, Clone)]
 pub struct VarIdent {
     pub ident: String,
-    pub expr: Expr, // Теперь выражение вместо Stmt
+    pub expr: Expr,
 }
 
 impl VarIdent {

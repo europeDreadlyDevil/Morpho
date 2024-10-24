@@ -131,6 +131,7 @@ dependencies = [
  "anyhow",
  "lalrpop",
  "lalrpop-util",
+ "lazy_static",
 ]
 
 [[package]]

@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests {
     use func_lang::ast::{CallExpr, Expr, FuncBody, FuncIdent, Stmt, VarIdent};
-    use lalrpop_util::lalrpop_mod;
-
-    lalrpop_mod!(pub parser);
+    use func_lang::*;
     #[test]
     fn expr_parsing_test() {
         assert_eq!(
@@ -47,6 +45,22 @@ mod tests {
                     Expr::StringLit("Bye, world!".into())
                 )
             ])
+        );
+        assert_eq!(
+            parser::ExprParser::new().parse("2+2*9==21*231").unwrap(),
+            Expr::Eq(
+                Box::new(Expr::Add(
+                    Box::new(Expr::Integer(2)),
+                    Box::new(Expr::Mul(
+                        Box::new(Expr::Integer(2)),
+                        Box::new(Expr::Integer(9))
+                    ))
+                )),
+                Box::new(Expr::Mul(
+                    Box::new(Expr::Integer(21)),
+                    Box::new(Expr::Integer(231))
+                ))
+            )
         )
     }
 

@@ -32,6 +32,33 @@ VarIdent: VarIdent = {
 };
 
 pub Expr: Expr = {
+    <l: ExprCond> => l,
+};
+
+ExprCond: Expr = {
+    <l: ExprAddSub> "==" <r: ExprCond> => Expr::Eq(Box::new(l), Box::new(r)),
+    <l: ExprAddSub> "!=" <r: ExprCond> => Expr::NotEq(Box::new(l), Box::new(r)),
+    ExprAddSub
+}
+
+ExprAddSub: Expr = {
+    <l: ExprMulDiv> "+" <r: ExprAddSub> => Expr::Add(Box::new(l), Box::new(r)),
+    <l: ExprMulDiv> "-" <r: ExprAddSub> => Expr::Sub(Box::new(l), Box::new(r)),
+    ExprMulDiv,
+};
+
+ExprMulDiv: Expr = {
+    <l: ExprFactor> "*" <r: ExprMulDiv> => Expr::Mul(Box::new(l), Box::new(r)),
+    <l: ExprFactor> "/" <r: ExprMulDiv> => Expr::Div(Box::new(l), Box::new(r)),
+    ExprFactor,
+};
+
+ExprFactor: Expr = {
+    "(" <e: Expr> ")" => e,
+    <expr: PrimitiveExpr> => expr,
+};
+
+PrimitiveExpr: Expr = {
     <id: Ident> => Expr::Ident(id),
     <int: Integer> => Expr::Integer(int),
     <float: Float> => Expr::Float(float),
@@ -40,7 +67,17 @@ pub Expr: Expr = {
     <call: CallExpr> => Expr::Call(call),
     <array: Array> => Expr::Array(array),
     <dict: Dictionary> => Expr::Dictionary(dict),
-};
+    <func: FuncPtr> => Expr::Func(func),
+    <range: Range> => Expr::Range(range)
+}
+
+Range: (i64, i64) = {
+    <start: Integer> ".." <end: Integer> => (start, end)
+}
+
+FuncPtr: FuncPtr = {
+    "$" <id: Ident> "|" <args: Comma<Expr>> "|" => FuncPtr::new(&id, Some(args))
+}
 
 CallExpr: CallExpr = {
     <id: Ident> "(" <args: Comma<Expr>> ")" => CallExpr::new(id, args),

@@ -1,37 +1,57 @@
-use crate::ast::{Expr, FuncBody, FuncIdent, Prog, Stmt, VarIdent};
-use std::collections::HashMap;
-use std::fmt::{write, Display, Formatter};
+#![feature(tuple_trait)]
+
+use crate::ast::{CallExpr, Expr, FuncBody, Prog, Stmt, VarIdent};
+use anyhow::__private::kind::TraitKind;
 use anyhow::{Error, Result};
-use std::sync::{Arc, Mutex};
 use lalrpop_util::lalrpop_mod;
+use lazy_static::lazy_static;
+use std::any::Any;
+use std::collections::HashMap;
+use std::env::Args;
+use std::fmt::{Display, Formatter};
+use std::marker::Tuple;
+use std::ops::{Add, Div, Mul, Sub};
+use std::sync::{Arc, Mutex, RwLock, TryLockResult};
 
 lalrpop_mod!(pub parser);
+
+lazy_static! {
+    static ref GLOBAL_ENV: Arc<RwLock<Environment>> = Arc::new(RwLock::new(Environment::new()));
+}
 
 pub mod ast;
 
 pub fn eval_program(prog: Prog) -> Result<()> {
     let prog = Program::new(prog)?;
-    prog.run();
+    prog.run()?;
     Ok(())
 }
 
 struct Program {
-    env: Environment,
+    main_function: Function,
 }
 
 impl Program {
-    pub(crate) fn run(mut self) {
-        let mut main_func = self.env.main_function.clone();
-        main_func.run(&mut self.env);
+    pub(crate) fn run(mut self) -> Result<()> {
+        self.main_function.run();
+        Ok(())
     }
 }
 
 impl Program {
     pub fn new(prog: Prog) -> Result<Self> {
-        let mut global_stmts: HashMap<String, Value> = HashMap::new();
-        
-        global_stmts.insert("print".into(), Value::FuncPtr(print));
-        
+        GLOBAL_ENV
+            .try_write()
+            .unwrap()
+            .insert_stmt("print", Value::FuncPtr(print));
+        GLOBAL_ENV
+            .try_write()
+            .unwrap()
+            .insert_stmt("if".into(), Value::FuncPtr(if_func));
+        GLOBAL_ENV
+            .try_write()
+            .unwrap()
+            .insert_stmt("for".into(), Value::FuncPtr(for_func));
         let mut extracted_functions: HashMap<String, Function> = HashMap::new();
 
         for stmt in prog.0 {
@@ -41,24 +61,20 @@ impl Program {
         }
 
         for (ident, func) in extracted_functions {
-            global_stmts.insert(ident, Value::Func(func));
+            GLOBAL_ENV
+                .try_write()
+                .unwrap()
+                .insert_stmt(&ident, Value::Func(func));
         }
-        
-        
-        if let Some(main_func) = if let Some(main_func) = global_stmts.get("main") {
-            if let crate::Value::Func(main_func) = main_func {
-                Some(main_func.clone())
-            } else { None }
-        } else { None } {
-            return Ok(Self {
-                env: Environment::new(
-                    main_func,
-                    global_stmts,
-                ),
-            })
+
+        if let Some(main_func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get("main") {
+            if let Value::Func(main_func) = main_func {
+                return Ok(Self {
+                    main_function: main_func.clone(),
+                });
+            }
         }
-        
-        Err(Error::msg("main func not found"))
+        Err(Error::msg("Main function not found"))
     }
 }
 
@@ -84,21 +100,23 @@ fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
     None
 }
 
+#[derive(Debug)]
 struct Environment {
     global_stmts: HashMap<String, Value>,
-    main_function: Function,
 }
 
 impl Environment {
-    pub fn new(main_function: Function, global_stmts: HashMap<String, Value>) -> Self {
+    pub fn new() -> Self {
         Self {
-            global_stmts,
-            main_function,
+            global_stmts: HashMap::new(),
         }
+    }
+    pub fn insert_stmt(&mut self, ident: &str, stmt: Value) {
+        self.global_stmts.insert(ident.into(), stmt);
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 struct LocalEnvironment {
     variables: HashMap<String, Value>,
 }
@@ -111,14 +129,61 @@ impl LocalEnvironment {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum Value {
     String(String),
     Int(i64),
-    FuncPtr(fn(Vec<Value>)),
+    Bool(bool),
+    FuncPtr(fn(Vec<Value>, &LocalEnvironment) -> Value),
     Func(Function),
+    CallFunc(CallExpr),
     Type(String),
+    Range(i64, i64),
     None,
+}
+
+impl Add for Value {
+    type Output = Value;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
+            _ => Value::None
+        }
+    }
+}
+
+impl Sub for Value {
+    type Output = Value;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
+            _ => Value::None
+        }
+    }
+}
+
+impl Mul for Value {
+    type Output = Value;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+            _ => Value::None
+        }
+    }
+}
+
+impl Div for Value {
+    type Output = Value;
+
+    fn div(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
+            _ => Value::None
+        }
+    }
 }
 
 impl Value {
@@ -127,9 +192,12 @@ impl Value {
             Value::String(_) => Value::Type("string".into()),
             Value::Int(_) => Value::Type("int".into()),
             Value::FuncPtr(func) => Value::Type(format!("{:?}", func)),
-            Value::Func(Function{rty, ..}) => Value::Type(rty),
+            Value::Func(Function { rty, .. }) => Value::Type(rty),
             Value::Type(ty) => Value::Type(ty),
-            Value::None => Value::Type("none".into())
+            Value::None => Value::Type("none".into()),
+            Value::Bool(_) => Value::Type("bool".into()),
+            Value::CallFunc { .. } => Value::Type("func".into()),
+            Value::Range(s, e) => Value::Type(format!("range<{}, {}>", s, e))
         }
     }
 }
@@ -142,12 +210,15 @@ impl Display for Value {
             Value::Func(func) => write!(f, "{}", func.ident),
             Value::None => write!(f, "None"),
             Value::FuncPtr(func_ptr) => write!(f, "{:?}", func_ptr),
-            Value::Type(ty) => write!(f, "{}", ty)
+            Value::Type(ty) => write!(f, "{}", ty),
+            Value::Bool(b) => write!(f, "{}", b),
+            Value::CallFunc (call) => write!(f, "{}", call.get_name()),
+            Value::Range(s, e) => write!(f, "range<{}, {}>", s, e)
         }
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 struct Function {
     function_fields: HashMap<String, Value>,
     environment: LocalEnvironment,
@@ -158,42 +229,20 @@ struct Function {
 }
 
 impl Function {
-    pub(crate) fn run(&mut self, g_env: &mut Environment) {
+    pub(crate) fn run(&mut self) {
         for stmt in self.body.clone() {
             match stmt {
-                Stmt::Expr(expr) => match *expr { 
+                Stmt::Expr(expr) => match *expr {
                     Expr::Call(call_expr) => {
-                        let ident = call_expr.get_name();
-                        let args = call_expr.get_args();
-                        let mut parsed_args: Vec<Value> = vec![];
-                        for arg in args {
-                            parsed_args.push(eval_expr(arg, &self.environment));
-                        }
-                        match g_env.global_stmts.clone().get_mut(&ident).unwrap() {
-                            Value::FuncPtr(func) => func(parsed_args),
-                            Value::Func(ref mut func) => {
-                                let mut l_env = LocalEnvironment::new();
-                                for i in 0..func.args.len() {
-                                    let (ident, ty) = func.args[i].clone();
-                                    if Value::Type(ty) == parsed_args[i].clone().into_type() {
-                                        l_env.variables.insert(ident, parsed_args[i].clone());
-                                    }
-                                    else { panic!("Expected other type") }
-                                }
-                                func.environment = l_env;
-                                func.run(g_env)
-                            }
-                            _ => {}
-                        }
-                        
-                    },
-                    _ => panic!("Unhandled expression")
+                        call_func(call_expr, &self.environment)
+                    }
+                    _ => panic!("Unhandled expression"),
                 },
-                Stmt::VarIdent(VarIdent{ ident, expr }) => {
+                Stmt::VarIdent(VarIdent { ident, expr }) => {
                     let value = eval_expr(expr, &self.environment);
                     self.environment.variables.insert(ident, value);
                 }
-                _ => panic!("Unhandled statement")
+                _ => panic!("Unhandled statement"),
             }
         }
     }
@@ -204,7 +253,77 @@ fn eval_expr(expr: Expr, env: &LocalEnvironment) -> Value {
         Expr::Integer(i) => Value::Int(i),
         Expr::StringLit(s) => Value::String(s),
         Expr::Ident(ident) => env.variables.get(&ident).unwrap().clone(),
-        _ => Value::None
+        Expr::Bool(b) => Value::Bool(b),
+        Expr::Call(call_expr) => { call_func(call_expr, env); Value::None },
+        Expr::Func(f_ptr) => Value::CallFunc (CallExpr::new(f_ptr.ident.clone(), f_ptr.args.unwrap())),
+        Expr::Eq(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            Value::Bool(l == r)
+        },
+        Expr::NotEq(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            Value::Bool(l != r)
+        },
+        Expr::Add(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l + r
+        },
+        Expr::Sub(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l - r
+        },
+        Expr::Mul(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l * r
+        },
+        Expr::Div(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l / r
+        },
+        Expr::Range((start, end)) => Value::Range(start, end),
+        _ => Value::None,
+    }
+}
+
+fn call_func(call_expr: CallExpr, env: &LocalEnvironment) {
+    let ident = call_expr.get_name();
+    let args = call_expr.get_args();
+    let mut parsed_args: Vec<Value> = vec![];
+    for arg in args {
+        parsed_args.push(eval_expr(arg, env));
+    }
+    match GLOBAL_ENV
+        .try_read()
+        .unwrap()
+        .global_stmts
+        .clone()
+        .get(&ident)
+        .unwrap()
+        .clone()
+    {
+        Value::FuncPtr(func) => {
+            func(parsed_args, env);
+        }
+        Value::Func(mut func) => {
+            let mut l_env = LocalEnvironment::new();
+            for i in 0..func.args.len() {
+                let (ident, ty) = func.args[i].clone();
+                if Value::Type(ty) == parsed_args[i].clone().into_type() {
+                    l_env.variables.insert(ident, parsed_args[i].clone());
+                } else {
+                    panic!("Expected other type")
+                }
+            }
+            func.environment = l_env;
+            func.run()
+        }
+        _ => {}
     }
 }
 
@@ -228,10 +347,70 @@ impl Function {
     }
 }
 
-
-fn print(items: Vec<Value>) {
-    for i in 0..items.len()-1 {
-        print!("{} ", items[i]);
+fn print(args: Vec<Value>, env: &LocalEnvironment) -> Value {
+    for i in 0..args.len() - 1 {
+        print!("{} ", args[i]);
     }
-    println!("{}", items[items.len()-1])
+    println!("{}", args[args.len() - 1]);
+    Value::None
+}
+
+fn if_func(args: Vec<Value>, env: &LocalEnvironment) -> Value {
+    //println!("If block: {:?}", args);
+    if let Value::Bool(true) = &args[0] {
+        if let Value::CallFunc(call_expr) = args[1].clone() {
+            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                if let Value::FuncPtr(func) = func {
+                    let mut parsed_args = vec![];
+                    
+                    for arg in call_expr.get_args() {
+                        parsed_args.push(eval_expr(arg, &env))
+                    }
+                    return func(parsed_args, env)
+                }
+            }
+        }
+    } else if let Value::Bool(false) = &args[0] {
+        if let Value::CallFunc(call_expr) = args[2].clone() {
+            let mut parsed_args = vec![];
+
+            for arg in call_expr.get_args() {
+                parsed_args.push(eval_expr(arg, env))
+            }
+            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                if let Value::FuncPtr(func) = func {
+                    
+                    return func(parsed_args,env)
+                }
+            }
+            call_func(call_expr, &env);
+        }
+    }
+    Value::None
+}
+
+fn for_func(args: Vec<Value>, env: &LocalEnvironment) -> Value {
+    if let Value::Range(start, end) = args[0] {
+        if let Value::CallFunc(call_expr) = args[1].clone() {
+            let mut parsed_args = vec![];
+
+            for arg in call_expr.get_args() {
+                parsed_args.push(eval_expr(arg, env))
+            }
+            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                if let Value::FuncPtr(func) = func {
+                    
+                    for _ in start..end {
+                        func(parsed_args.clone(), env);
+                    }
+                    
+                }
+            }
+
+            for _ in start..end {
+                call_func(call_expr.clone(), &env);
+            }
+        }
+    }
+    Value::None
 }

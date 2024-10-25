@@ -96,7 +96,7 @@ fn condition_block_recursion() -> Result<()> {
 
 fn for_block() -> Result<()> {
     let ast = ProgParser::new()
-        .parse(r#"func main = () { for(0..10000, $for|0..10000, $say|"I love rust"||); } func say = (str: string) { print(str); }"#)?;
+        .parse(r#"func main = () { for(i in 0..10, $say|i|); } func say = (num: int) { print(num); }"#)?;
     log!(Level::Info, "Starting...");
     eval_program(ast).unwrap();
     Ok(())

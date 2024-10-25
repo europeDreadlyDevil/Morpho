@@ -18,6 +18,7 @@ pub enum Expr {
     Eq(Box<Expr>, Box<Expr>),
     NotEq(Box<Expr>, Box<Expr>),
     Func(FuncPtr),
+    Counter((String, (i64, i64))),
     Range((i64, i64))
 }
 

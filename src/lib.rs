@@ -12,11 +12,20 @@ use std::fmt::{Display, Formatter};
 use std::marker::Tuple;
 use std::ops::{Add, Div, Mul, Sub};
 use std::sync::{Arc, Mutex, RwLock, TryLockResult};
+use rand::Rng;
 
 lalrpop_mod!(pub parser);
 
 lazy_static! {
     static ref GLOBAL_ENV: Arc<RwLock<Environment>> = Arc::new(RwLock::new(Environment::new()));
+}
+
+#[macro_export] macro_rules! for_macro {
+    ($ident: expr, $start: expr, $end: expr, $f: expr) => {
+        for $ident in $start..$end {
+            $f;
+        }
+    };
 }
 
 pub mod ast;
@@ -134,11 +143,13 @@ enum Value {
     String(String),
     Int(i64),
     Bool(bool),
-    FuncPtr(fn(Vec<Value>, &LocalEnvironment) -> Value),
+    FuncPtr(fn(Vec<Value>, &mut LocalEnvironment) -> Value),
     Func(Function),
     CallFunc(CallExpr),
     Type(String),
     Range(i64, i64),
+    Counter(String, i64, i64),
+    Eq(Box<Expr>, Box<Expr>),
     None,
 }
 
@@ -197,7 +208,9 @@ impl Value {
             Value::None => Value::Type("none".into()),
             Value::Bool(_) => Value::Type("bool".into()),
             Value::CallFunc { .. } => Value::Type("func".into()),
-            Value::Range(s, e) => Value::Type(format!("range<{}, {}>", s, e))
+            Value::Range(s, e) => Value::Type(format!("range<{}, {}>", s, e)),
+            Value::Counter(ident, s, e) => Value::Type(format!("counter<{}, {}, {}>", ident, s, e)),
+            Value::Eq(_, _) => Value::Type("bool".into())
         }
     }
 }
@@ -213,7 +226,9 @@ impl Display for Value {
             Value::Type(ty) => write!(f, "{}", ty),
             Value::Bool(b) => write!(f, "{}", b),
             Value::CallFunc (call) => write!(f, "{}", call.get_name()),
-            Value::Range(s, e) => write!(f, "range<{}, {}>", s, e)
+            Value::Range(s, e) => write!(f, "range<{}, {}>", s, e),
+            Value::Counter(ident, s, e) => write!(f, "counter<{}, {}, {}>", ident, s, e),
+            Value::Eq(a, b) => write!(f, "{}", a==b )
         }
     }
 }
@@ -234,12 +249,12 @@ impl Function {
             match stmt {
                 Stmt::Expr(expr) => match *expr {
                     Expr::Call(call_expr) => {
-                        call_func(call_expr, &self.environment)
+                        call_func(call_expr, &mut self.environment)
                     }
                     _ => panic!("Unhandled expression"),
                 },
                 Stmt::VarIdent(VarIdent { ident, expr }) => {
-                    let value = eval_expr(expr, &self.environment);
+                    let value = eval_expr(expr, &mut self.environment);
                     self.environment.variables.insert(ident, value);
                 }
                 _ => panic!("Unhandled statement"),
@@ -248,18 +263,14 @@ impl Function {
     }
 }
 
-fn eval_expr(expr: Expr, env: &LocalEnvironment) -> Value {
+fn eval_expr(expr: Expr, env: &mut LocalEnvironment) -> Value {
+    //println!("EVAL_EXPR: {expr:?} {env:?}");
     match expr {
-        Expr::Integer(i) => Value::Int(i),
-        Expr::StringLit(s) => Value::String(s),
         Expr::Ident(ident) => env.variables.get(&ident).unwrap().clone(),
-        Expr::Bool(b) => Value::Bool(b),
         Expr::Call(call_expr) => { call_func(call_expr, env); Value::None },
         Expr::Func(f_ptr) => Value::CallFunc (CallExpr::new(f_ptr.ident.clone(), f_ptr.args.unwrap())),
         Expr::Eq(l, r) => {
-            let l = eval_expr(*l, env);
-            let r = eval_expr(*r, env);
-            Value::Bool(l == r)
+            Value::Eq(l, r)
         },
         Expr::NotEq(l, r) => {
             let l = eval_expr(*l, env);
@@ -287,11 +298,24 @@ fn eval_expr(expr: Expr, env: &LocalEnvironment) -> Value {
             l / r
         },
         Expr::Range((start, end)) => Value::Range(start, end),
-        _ => Value::None,
+        Expr::Counter((ident, (start, end))) => {
+            env.variables.insert(ident.clone(), Value::Int(start));
+            Value::Counter(ident, start, end)
+        },
+        _ => eval_primitive_expr(expr, env),
     }
 }
 
-fn call_func(call_expr: CallExpr, env: &LocalEnvironment) {
+fn eval_primitive_expr(expr: Expr, env: &mut LocalEnvironment) -> Value {
+    match expr {
+        Expr::Integer(i) => Value::Int(i),
+        Expr::StringLit(s) => Value::String(s),
+        Expr::Bool(b) => Value::Bool(b),
+        _ => Value::None
+    }
+}
+
+fn call_func(call_expr: CallExpr, env: &mut LocalEnvironment) {
     let ident = call_expr.get_name();
     let args = call_expr.get_args();
     let mut parsed_args: Vec<Value> = vec![];
@@ -347,7 +371,7 @@ impl Function {
     }
 }
 
-fn print(args: Vec<Value>, env: &LocalEnvironment) -> Value {
+fn print(args: Vec<Value>, _env: &mut LocalEnvironment) -> Value {
     for i in 0..args.len() - 1 {
         print!("{} ", args[i]);
     }
@@ -355,62 +379,92 @@ fn print(args: Vec<Value>, env: &LocalEnvironment) -> Value {
     Value::None
 }
 
-fn if_func(args: Vec<Value>, env: &LocalEnvironment) -> Value {
-    //println!("If block: {:?}", args);
-    if let Value::Bool(true) = &args[0] {
-        if let Value::CallFunc(call_expr) = args[1].clone() {
-            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
-                if let Value::FuncPtr(func) = func {
-                    let mut parsed_args = vec![];
-                    
-                    for arg in call_expr.get_args() {
-                        parsed_args.push(eval_expr(arg, &env))
-                    }
-                    return func(parsed_args, env)
-                }
-            }
-        }
-    } else if let Value::Bool(false) = &args[0] {
-        if let Value::CallFunc(call_expr) = args[2].clone() {
-            let mut parsed_args = vec![];
+fn if_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
+    //println!("If block: {:?} {env:?}", args);
+    if let Value::Eq(a, b) = args[0].clone() {
+        if eval_expr(*a, env) == eval_expr(*b, env) {
+            if let Value::CallFunc(call_expr) = args[1].clone() {
+                let mut parsed_args = vec![];
 
-            for arg in call_expr.get_args() {
-                parsed_args.push(eval_expr(arg, env))
-            }
-            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
-                if let Value::FuncPtr(func) = func {
-                    
-                    return func(parsed_args,env)
+                for arg in call_expr.get_args() {
+                    parsed_args.push(eval_expr(arg, env))
                 }
+                if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                    if let Value::FuncPtr(func) = func {
+
+                        return func(parsed_args,env)
+                    }
+                }
+                call_func(call_expr, env);
             }
-            call_func(call_expr, &env);
+        } else {
+            if let Value::CallFunc(call_expr) = args[2].clone() {
+                let mut parsed_args = vec![];
+
+                for arg in call_expr.get_args() {
+                    parsed_args.push(eval_expr(arg, env))
+                }
+                if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                    if let Value::FuncPtr(func) = func {
+
+                        return func(parsed_args,env)
+                    }
+                }
+                call_func(call_expr, env);
+            }
         }
+        
     }
     Value::None
 }
 
-fn for_func(args: Vec<Value>, env: &LocalEnvironment) -> Value {
-    if let Value::Range(start, end) = args[0] {
+fn for_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
+    if let Value::Range(start, end) = args[0].clone() {
         if let Value::CallFunc(call_expr) = args[1].clone() {
             let mut parsed_args = vec![];
 
             for arg in call_expr.get_args() {
                 parsed_args.push(eval_expr(arg, env))
             }
+
             if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
                 if let Value::FuncPtr(func) = func {
-                    
                     for _ in start..end {
                         func(parsed_args.clone(), env);
                     }
-                    
+                }
+                for _ in start..end {
+                    call_func(call_expr.clone(), env);
                 }
             }
+        }
+    }
+    if let Value::Counter(ident, start, end) = args[0].clone() {
+        if let Value::CallFunc(call_expr) = args[1].clone() {
+            let mut parsed_args = vec![];
 
-            for _ in start..end {
-                call_func(call_expr.clone(), &env);
+            for arg in call_expr.get_args() {
+                parsed_args.push(eval_expr(arg, env))
+            }
+            //println!("FOR_FUNC: {args:?} {env:?}");
+            if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
+                if let Value::FuncPtr(func) = func {
+                    for i in start..end {
+                        
+                        env.variables.insert(ident.clone(), Value::Int(i));
+                        func(parsed_args.clone(), env);
+                    }
+                }
+                else {
+                    for i in start..end {
+                        //println!("{i}");
+                        env.variables.insert(ident.clone(), Value::Int(i));
+                        call_func(call_expr.clone(), env);
+                    }
+                }
             }
         }
     }
     Value::None
 }
+

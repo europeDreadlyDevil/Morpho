@@ -68,11 +68,16 @@ PrimitiveExpr: Expr = {
     <array: Array> => Expr::Array(array),
     <dict: Dictionary> => Expr::Dictionary(dict),
     <func: FuncPtr> => Expr::Func(func),
+    <counter: Counter> => Expr::Counter(counter),
     <range: Range> => Expr::Range(range)
 }
 
 Range: (i64, i64) = {
     <start: Integer> ".." <end: Integer> => (start, end)
+}
+
+Counter: (String, (i64, i64)) = {
+   <id: Ident> "in" <range: Range> => (id, range)
 }
 
 FuncPtr: FuncPtr = {

@@ -1,13 +1,5 @@
-1. Parsing vars and basic implemented funcs
-```
-func main = () -> void {
-    print("Hello, world!");
-}
-```
-
-```
-func main = () { 
-    let x = "Hello, world!"; 
-    print(x); 
-}
-```
+- [x] Parsing vars and basic implemented funcs
+- [x] Func recursion and base print
+- [x] Conditional branches
+- [ ] Loops blocks (for, while, loop)
+- [ ] Func like structures with fields

@@ -19,7 +19,8 @@ pub enum Expr {
     NotEq(Box<Expr>, Box<Expr>),
     Func(FuncPtr),
     Counter((String, (i64, i64))),
-    Range((i64, i64))
+    Range((i64, i64)),
+    AnonFunc(AnonymousFunc)
 }
 
 impl PartialEq for Expr {
@@ -85,6 +86,35 @@ pub enum Stmt {
     FuncBody(FuncBody),
     VarIdent(VarIdent),
     Expr(Box<Expr>),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct AnonymousFunc {
+    pub args: Vec<(String, Expr)>,
+    pub rty: String,
+    pub stmt: Option<FuncBody>,
+}
+
+impl AnonymousFunc {
+    pub fn new_w_rty(
+        args: Vec<(String,Expr)>,
+        rty: String,
+        stmt: Option<FuncBody>,
+    ) -> Self {
+        Self {
+            args,
+            stmt,
+            rty,
+        }
+    }
+
+    pub fn new_wo_rty(args: Vec<(String,Expr)>, stmt: Option<FuncBody>) -> Self {
+        Self {
+            args,
+            stmt,
+            rty: "void".into(),
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]

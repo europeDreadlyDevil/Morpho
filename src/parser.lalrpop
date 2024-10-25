@@ -19,6 +19,15 @@ FuncIdent: FuncIdent = {
         => FuncIdent::new_w_rty(&id, args, rtype, Some(body)),
 };
 
+AnonymousFunc: AnonymousFunc = {
+    "$|" <args: Comma<AnonymousFuncArg>> "|" <body: FuncBody>
+            => AnonymousFunc::new_wo_rty(args, Some(body)),
+}
+
+AnonymousFuncArg: (String, Expr) = {
+    <id: Ident> ":" <expr: Expr> => (id, expr)
+}
+
 Arg: (String, String) = {
     <id: Ident> ":" <ty: Type> => (id, ty)
 };
@@ -69,7 +78,8 @@ PrimitiveExpr: Expr = {
     <dict: Dictionary> => Expr::Dictionary(dict),
     <func: FuncPtr> => Expr::Func(func),
     <counter: Counter> => Expr::Counter(counter),
-    <range: Range> => Expr::Range(range)
+    <range: Range> => Expr::Range(range),
+    <anon_func: AnonymousFunc> => Expr::AnonFunc(anon_func),
 }
 
 Range: (i64, i64) = {

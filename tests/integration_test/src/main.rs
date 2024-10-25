@@ -16,6 +16,7 @@ fn main() -> Result<()> {
     condition_block()?;
     condition_block_recursion()?;
     for_block()?;
+    for_block_with_anon_func()?;
     Ok(())
 }
 
@@ -97,6 +98,14 @@ fn condition_block_recursion() -> Result<()> {
 fn for_block() -> Result<()> {
     let ast = ProgParser::new()
         .parse(r#"func main = () { for(i in 0..10, $say|i|); } func say = (num: int) { print(num); }"#)?;
+    log!(Level::Info, "Starting...");
+    eval_program(ast).unwrap();
+    Ok(())
+}
+
+fn for_block_with_anon_func() -> Result<()> {
+    let ast = ProgParser::new()
+        .parse(r#"func main = () { for(i in 0..10, $|j: i| { print(j); } ); }"#)?;
     log!(Level::Info, "Starting...");
     eval_program(ast).unwrap();
     Ok(())

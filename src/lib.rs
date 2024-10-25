@@ -1,18 +1,12 @@
-#![feature(tuple_trait)]
-
 use crate::ast::{CallExpr, Expr, FuncBody, Prog, Stmt, VarIdent};
-use anyhow::__private::kind::TraitKind;
 use anyhow::{Error, Result};
 use lalrpop_util::lalrpop_mod;
 use lazy_static::lazy_static;
-use std::any::Any;
 use std::collections::HashMap;
-use std::env::Args;
 use std::fmt::{Display, Formatter};
-use std::marker::Tuple;
 use std::ops::{Add, Div, Mul, Sub};
-use std::sync::{Arc, Mutex, RwLock, TryLockResult};
-use rand::Rng;
+use std::sync::{Arc, RwLock};
+use uuid::Uuid;
 
 lalrpop_mod!(pub parser);
 
@@ -269,6 +263,19 @@ fn eval_expr(expr: Expr, env: &mut LocalEnvironment) -> Value {
         Expr::Ident(ident) => env.variables.get(&ident).unwrap().clone(),
         Expr::Call(call_expr) => { call_func(call_expr, env); Value::None },
         Expr::Func(f_ptr) => Value::CallFunc (CallExpr::new(f_ptr.ident.clone(), f_ptr.args.unwrap())),
+        Expr::AnonFunc(a_func) => {
+            let ident = Uuid::new_v4().to_string();
+            let mut args = vec![];
+            let mut call_args = vec![];
+            for (ident, expr) in a_func.args.clone() {
+                let value = eval_expr(expr.clone(), env);
+                args.push((ident, value.into_type().to_string()));
+                call_args.push(expr)
+            }
+            let func = Function::new(HashMap::new(), env.clone(), ident.clone(), args, a_func.rty, a_func.stmt.unwrap().stmt );
+            env.variables.insert(ident.clone(), Value::Func(func));
+            Value::CallFunc(CallExpr::new(ident, call_args))
+        },
         Expr::Eq(l, r) => {
             Value::Eq(l, r)
         },
@@ -322,32 +329,52 @@ fn call_func(call_expr: CallExpr, env: &mut LocalEnvironment) {
     for arg in args {
         parsed_args.push(eval_expr(arg, env));
     }
+    
     match GLOBAL_ENV
         .try_read()
         .unwrap()
         .global_stmts
         .clone()
-        .get(&ident)
-        .unwrap()
-        .clone()
+        .get(&ident) 
     {
-        Value::FuncPtr(func) => {
-            func(parsed_args, env);
-        }
-        Value::Func(mut func) => {
-            let mut l_env = LocalEnvironment::new();
-            for i in 0..func.args.len() {
-                let (ident, ty) = func.args[i].clone();
-                if Value::Type(ty) == parsed_args[i].clone().into_type() {
-                    l_env.variables.insert(ident, parsed_args[i].clone());
-                } else {
-                    panic!("Expected other type")
-                }
+        None => match env.variables.get(&ident).unwrap().clone() {
+            Value::FuncPtr(func) => {
+                func(parsed_args, env);
             }
-            func.environment = l_env;
-            func.run()
+            Value::Func(mut func) => {
+                let mut l_env = LocalEnvironment::new();
+                for i in 0..func.args.len() {
+                    let (ident, ty) = func.args[i].clone();
+                    if Value::Type(ty) == parsed_args[i].clone().into_type() {
+                        l_env.variables.insert(ident, parsed_args[i].clone());
+                    } else {
+                        panic!("Expected other type")
+                    }
+                }
+                func.environment = l_env;
+                func.run()
+            }
+            _ => {}
         }
-        _ => {}
+        Some(func) => match func.clone() {
+            Value::FuncPtr(func) => {
+                func(parsed_args, env);
+            }
+            Value::Func(mut func) => {
+                let mut l_env = LocalEnvironment::new();
+                for i in 0..func.args.len() {
+                    let (ident, ty) = func.args[i].clone();
+                    if Value::Type(ty) == parsed_args[i].clone().into_type() {
+                        l_env.variables.insert(ident, parsed_args[i].clone());
+                    } else {
+                        panic!("Expected other type")
+                    }
+                }
+                func.environment = l_env;
+                func.run()
+            }
+            _ => {}
+        }
     }
 }
 
@@ -413,7 +440,7 @@ fn if_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
                 call_func(call_expr, env);
             }
         }
-        
+
     }
     Value::None
 }
@@ -450,7 +477,7 @@ fn for_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
             if let Some(func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get(&call_expr.get_name()) {
                 if let Value::FuncPtr(func) = func {
                     for i in start..end {
-                        
+
                         env.variables.insert(ident.clone(), Value::Int(i));
                         func(parsed_args.clone(), env);
                     }
@@ -462,7 +489,13 @@ fn for_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
                         call_func(call_expr.clone(), env);
                     }
                 }
+            } else {
+                for i in start..end {
+                    env.variables.insert(ident.clone(), Value::Int(i));
+                    call_func(call_expr.clone(), env);
+                }
             }
+            
         }
     }
     Value::None

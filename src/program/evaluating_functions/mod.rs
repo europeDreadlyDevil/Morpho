@@ -1,0 +1,152 @@
+use std::collections::HashMap;
+use uuid::Uuid;
+use crate::ast::{CallExpr, Expr, FuncBody, Prog, Stmt};
+use crate::GLOBAL_ENV;
+use crate::program::environment::LocalEnvironment;
+use crate::program::function::Function;
+use crate::program::Program;
+use crate::program::value::Value;
+
+pub fn eval_program(prog: Prog) -> anyhow::Result<()> {
+    let prog = Program::new(prog)?;
+    prog.run()?;
+    Ok(())
+}
+pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
+    match func_stmt {
+        Stmt::FuncIdent(f_ident) => {
+            if let Some(FuncBody { stmt }) = f_ident.stmt {
+                return Some((
+                    f_ident.ident.clone(),
+                    Function::new(
+                        HashMap::new(),
+                        LocalEnvironment::new(),
+                        f_ident.ident,
+                        f_ident.args,
+                        f_ident.rty,
+                        stmt,
+                    ),
+                ));
+            }
+        }
+        _ => {}
+    }
+    None
+}
+
+pub fn eval_expr(expr: Expr, env: &mut LocalEnvironment) -> Value {
+    //println!("EVAL_EXPR: {expr:?} {env:?}");
+    match expr {
+        Expr::Ident(ident) => env.variables.get(&ident).unwrap().clone(),
+        Expr::Call(call_expr) => { call_func(call_expr, env); Value::None },
+        Expr::Func(f_ptr) => Value::CallFunc (CallExpr::new(f_ptr.ident.clone(), f_ptr.args.unwrap())),
+        Expr::AnonFunc(a_func) => {
+            let ident = Uuid::new_v4().to_string();
+            let mut args = vec![];
+            let mut call_args = vec![];
+            for (ident, expr) in a_func.args.clone() {
+                let value = eval_expr(expr.clone(), env);
+                args.push((ident, value.into_type().to_string()));
+                call_args.push(expr)
+            }
+            let func = Function::new(HashMap::new(), env.clone(), ident.clone(), args, a_func.rty, a_func.stmt.unwrap().stmt );
+            env.variables.insert(ident.clone(), Value::Func(func));
+            Value::CallFunc(CallExpr::new(ident, call_args))
+        },
+        Expr::Eq(l, r) => {
+            Value::Eq(l, r)
+        },
+        Expr::NotEq(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            Value::Bool(l != r)
+        },
+        Expr::Add(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l + r
+        },
+        Expr::Sub(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l - r
+        },
+        Expr::Mul(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l * r
+        },
+        Expr::Div(l, r) => {
+            let l = eval_expr(*l, env);
+            let r = eval_expr(*r, env);
+            l / r
+        },
+        Expr::Range((start, end)) => Value::Range(start, end),
+        Expr::Counter((ident, (start, end))) => {
+            env.variables.insert(ident.clone(), Value::Int(start));
+            Value::Counter(ident, start, end)
+        },
+        _ => eval_primitive_expr(expr, env),
+    }
+}
+
+pub fn eval_primitive_expr(expr: Expr, _env: &mut LocalEnvironment) -> Value {
+    match expr {
+        Expr::Integer(i) => Value::Int(i),
+        Expr::StringLit(s) => Value::String(s),
+        Expr::Bool(b) => Value::Bool(b),
+        _ => Value::None
+    }
+}
+
+macro_rules! macro_extract_func {
+    ($expr: expr, $call_expr: expr, $env: expr) => {
+        {
+            let call_expr: CallExpr = $call_expr;
+            let env: &mut LocalEnvironment = $env;
+            let args = call_expr.get_args();
+            let mut parsed_args: Vec<Value> = vec![];
+            for arg in args {
+                parsed_args.push(eval_expr(arg, env));
+            }
+            
+            match $expr {
+                Value::FuncPtr(func) => {
+                    func(parsed_args, env);
+                }
+                Value::Func(mut func) => {
+                    let mut l_env = LocalEnvironment::new();
+                    for i in 0..func.get_args().len() {
+                        let (ident, ty) = func.get_args()[i].clone();
+                        if Value::Type(ty) == parsed_args[i].clone().into_type() {
+                            l_env.variables.insert(ident, parsed_args[i].clone());
+                        } else {
+                            panic!("Expected other type")
+                        }
+                    }
+                    func.set_env(l_env);
+                    func.run()
+                }
+                _ => {}
+            }
+        }
+    };
+}
+
+pub fn call_func(call_expr: CallExpr, env: &mut LocalEnvironment) {
+    let ident = call_expr.get_name();
+    match GLOBAL_ENV
+        .try_read()
+        .unwrap()
+        .global_stmts
+        .clone()
+        .get(&ident)
+    {
+        None => { 
+            let func = env.variables.get(&ident).unwrap().clone();
+            macro_extract_func!(func, call_expr, env) 
+        },
+        Some(func) => macro_extract_func!(func.clone(), call_expr, env),
+    }
+}
+

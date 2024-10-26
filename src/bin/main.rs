@@ -2,9 +2,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use clap::Parser;
-use func_lang::eval_program;
 use func_lang::parser::ProgParser;
 use anyhow::Result;
+use func_lang::program::evaluating_functions::eval_program;
 
 #[derive(Parser, Clone)]
 #[command()]

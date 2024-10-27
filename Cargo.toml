@@ -7,6 +7,13 @@ edition = "2021"
 name = "unit"
 path = "tests/unit/unit.test.rs"
 
+[[bench]]
+name="lang_benches"
+harness = false
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [build-dependencies]
 lalrpop = "0.22.0"
 
@@ -16,3 +23,6 @@ anyhow = "1.0.90"
 lazy_static = "1.5.0"
 clap = {version = "4.5.20", features = ["derive"]}
 uuid = { version = "1", features = ["v4"] }
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+tracing-log = "0.2.0"

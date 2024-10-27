@@ -228,6 +228,9 @@ dependencies = [
  "lalrpop",
  "lalrpop-util",
  "lazy_static",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
  "uuid",
 ]
 

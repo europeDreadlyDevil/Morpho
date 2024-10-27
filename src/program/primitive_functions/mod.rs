@@ -64,10 +64,11 @@ pub fn for_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
                         for _ in start..end {
                             func(parsed_args.clone(), env);
                         }
+                        return Value::None
                     }
-                    for _ in start..end {
-                        call_func(call_expr.clone(), env);
-                    }
+                }
+                for _ in start..end {
+                    call_func(call_expr.clone(), env);
                 }
             }
         }
@@ -84,8 +85,8 @@ pub fn for_func(args: Vec<Value>, env: &mut LocalEnvironment) -> Value {
                         for i in start..end {
                             env.variables.insert(ident.clone(), Value::Int(i));
                             func(parsed_args.clone(), env);
-                            return Value::None
                         }
+                        return Value::None
                     }
                 }
                 for i in start..end {

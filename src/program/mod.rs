@@ -1,24 +1,23 @@
-pub mod value;
-pub mod function;
-pub mod primitive_functions;
 pub mod environment;
 pub mod evaluating_functions;
+pub mod function;
+pub mod primitive_functions;
+pub mod value;
 
-use std::collections::HashMap;
-use anyhow::{Error, Result};
 use crate::ast::Prog;
-use crate::GLOBAL_ENV;
 use crate::program::evaluating_functions::extract_func;
 use crate::program::function::Function;
 use crate::program::primitive_functions::{for_func, if_func, print_func};
 use crate::program::value::Value;
+use crate::GLOBAL_ENV;
+use anyhow::{Error, Result};
+use std::collections::HashMap;
 
 struct Program {
     main_function: Function,
 }
 
 impl Program {
-
     pub fn new(prog: Prog) -> Result<Self> {
         GLOBAL_ENV
             .try_write()
@@ -48,7 +47,7 @@ impl Program {
         }
 
         if let Some(main_func) = GLOBAL_ENV.try_read().unwrap().global_stmts.get("main") {
-            if let Value::Func(main_func) = main_func {
+            if let Value::Func(main_func) = main_func.clone().try_read().unwrap().clone() {
                 return Ok(Self {
                     main_function: main_func.clone(),
                 });

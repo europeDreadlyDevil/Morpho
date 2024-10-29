@@ -1,9 +1,10 @@
-use std::collections::HashMap;
 use crate::program::value::Value;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct Environment {
-    pub(crate) global_stmts: HashMap<String, Value>,
+    pub(crate) global_stmts: HashMap<String, Arc<RwLock<Value>>>,
 }
 
 impl Environment {
@@ -13,13 +14,14 @@ impl Environment {
         }
     }
     pub fn insert_stmt(&mut self, ident: &str, stmt: Value) {
-        self.global_stmts.insert(ident.into(), stmt);
+        self.global_stmts
+            .insert(ident.into(), Arc::new(RwLock::new(stmt)));
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub struct LocalEnvironment {
-    pub(crate) variables: HashMap<String, Value>,
+    pub(crate) variables: HashMap<String, Arc<RwLock<Value>>>,
 }
 
 impl LocalEnvironment {

@@ -17,6 +17,7 @@ fn main() -> Result<()> {
     condition_block_recursion()?;
     for_block()?;
     for_block_with_anon_func()?;
+    for_block_with_anon_func_and_ref()?;
     Ok(())
 }
 
@@ -107,6 +108,14 @@ fn for_block_with_anon_func() -> Result<()> {
     log!(Level::Info, "Starting for_block_with_anon_func...");
     let ast = ProgParser::new()
         .parse(r#"func main = () { for(i in 0..10, $|i: i| { print(i); } ); }"#)?;
+    eval_program(ast).unwrap();
+    Ok(())
+}
+
+fn for_block_with_anon_func_and_ref() -> Result<()> {
+    log!(Level::Info, "Starting for_block_with_anon_func_and_ref...");
+    let ast = ProgParser::new()
+        .parse(r#"func main = () { let a = 10; for(i in 0..10, $|a: &a, i: i| {a = a + a; print(i+1, ":", a);});}"#)?;
     eval_program(ast).unwrap();
     Ok(())
 }

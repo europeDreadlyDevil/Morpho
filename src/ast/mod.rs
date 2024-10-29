@@ -8,6 +8,7 @@ pub enum Expr {
     Float(f64),
     Bool(bool),
     StringLit(String),
+    Ref(Box<Expr>),
     Array(Vec<Expr>),
     Dictionary(Vec<(Expr, Expr)>),
     Call(CallExpr),
@@ -20,7 +21,9 @@ pub enum Expr {
     Func(FuncPtr),
     Counter((String, (i64, i64))),
     Range((i64, i64)),
-    AnonFunc(AnonymousFunc)
+    AnonFunc(AnonymousFunc),
+    Gt(Box<Expr>, Box<Expr>),
+    Lt(Box<Expr>, Box<Expr>),
 }
 
 impl PartialEq for Expr {
@@ -37,12 +40,12 @@ impl PartialEq for Expr {
             (Expr::Array(a), Expr::Array(b)) => a == b,
             (Expr::Dictionary(a), Expr::Dictionary(b)) => a == b,
             (Expr::Call(a), Expr::Call(b)) => a == b,
-            (Expr::Add(a, b), Expr::Add(c,d)) => a == c && b == d,
-            (Expr::Sub(a, b), Expr::Sub(c,d)) => a == c && b == d,
-            (Expr::Mul(a, b), Expr::Mul(c,d)) => a == c && b == d,
-            (Expr::Div(a, b), Expr::Div(c,d)) => a == c && b == d,
-            (Expr::Eq(a, b), Expr::Eq(c,d)) => a == c && b == d,
-            (Expr::NotEq(a, b), Expr::NotEq(c,d)) => a == c && b == d,
+            (Expr::Add(a, b), Expr::Add(c, d)) => a == c && b == d,
+            (Expr::Sub(a, b), Expr::Sub(c, d)) => a == c && b == d,
+            (Expr::Mul(a, b), Expr::Mul(c, d)) => a == c && b == d,
+            (Expr::Div(a, b), Expr::Div(c, d)) => a == c && b == d,
+            (Expr::Eq(a, b), Expr::Eq(c, d)) => a == c && b == d,
+            (Expr::NotEq(a, b), Expr::NotEq(c, d)) => a == c && b == d,
             _ => false,
         }
     }
@@ -51,7 +54,7 @@ impl PartialEq for Expr {
 #[derive(Debug, Clone)]
 pub struct FuncPtr {
     pub ident: String,
-    pub args: Option<Vec<Expr>>
+    pub args: Option<Vec<Expr>>,
 }
 
 impl FuncPtr {
@@ -85,7 +88,20 @@ pub enum Stmt {
     FuncIdent(FuncIdent),
     FuncBody(FuncBody),
     VarIdent(VarIdent),
+    VarAssign(VarAssign),
     Expr(Box<Expr>),
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct VarAssign {
+    pub ident: String,
+    pub expr: Expr,
+}
+
+impl VarAssign {
+    pub fn new(ident: String, expr: Expr) -> Self {
+        Self { ident, expr }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -96,19 +112,11 @@ pub struct AnonymousFunc {
 }
 
 impl AnonymousFunc {
-    pub fn new_w_rty(
-        args: Vec<(String,Expr)>,
-        rty: String,
-        stmt: Option<FuncBody>,
-    ) -> Self {
-        Self {
-            args,
-            stmt,
-            rty,
-        }
+    pub fn new_w_rty(args: Vec<(String, Expr)>, rty: String, stmt: Option<FuncBody>) -> Self {
+        Self { args, stmt, rty }
     }
 
-    pub fn new_wo_rty(args: Vec<(String,Expr)>, stmt: Option<FuncBody>) -> Self {
+    pub fn new_wo_rty(args: Vec<(String, Expr)>, stmt: Option<FuncBody>) -> Self {
         Self {
             args,
             stmt,

@@ -9,8 +9,13 @@ pub Prog: Prog = {
 pub Stmt: Stmt = {
     <func: FuncIdent> => Stmt::FuncIdent(func),
     <var: VarIdent> ";" => Stmt::VarIdent(var),
+    <assign: VarAssign> ";" => Stmt::VarAssign(assign),
     <expr: Expr> ";" => Stmt::Expr(Box::new(expr)),
 };
+
+VarAssign: VarAssign = {
+    <ident: Ident> "=" <expr: Expr> => VarAssign::new(ident, expr),
+}
 
 FuncIdent: FuncIdent = {
     "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" <body: FuncBody>
@@ -47,6 +52,8 @@ pub Expr: Expr = {
 ExprCond: Expr = {
     <l: ExprAddSub> "==" <r: ExprCond> => Expr::Eq(Box::new(l), Box::new(r)),
     <l: ExprAddSub> "!=" <r: ExprCond> => Expr::NotEq(Box::new(l), Box::new(r)),
+    <l: ExprAddSub> ">" <r: ExprCond> => Expr::Gt(Box::new(l), Box::new(r)),
+    <l: ExprAddSub> "<" <r: ExprCond> => Expr::Lt(Box::new(l), Box::new(r)),
     ExprAddSub
 }
 
@@ -80,6 +87,7 @@ PrimitiveExpr: Expr = {
     <counter: Counter> => Expr::Counter(counter),
     <range: Range> => Expr::Range(range),
     <anon_func: AnonymousFunc> => Expr::AnonFunc(anon_func),
+    "&" <r: PrimitiveExpr> => Expr::Ref(Box::new(r)),
 }
 
 Range: (i64, i64) = {

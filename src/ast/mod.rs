@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub struct Prog(pub Vec<Stmt>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd)]
 pub enum Expr {
     Ident(String),
     Integer(i64),
@@ -51,7 +51,7 @@ impl PartialEq for Expr {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd, PartialEq)]
 pub struct FuncPtr {
     pub ident: String,
     pub args: Option<Vec<Expr>>,
@@ -65,7 +65,7 @@ impl FuncPtr {
         }
     }
 }
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct CallExpr {
     func_name: String,
     args: Vec<Expr>,
@@ -83,7 +83,7 @@ impl CallExpr {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub enum Stmt {
     FuncIdent(FuncIdent),
     FuncBody(FuncBody),
@@ -92,7 +92,7 @@ pub enum Stmt {
     Expr(Box<Expr>),
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct VarAssign {
     pub ident: String,
     pub expr: Expr,
@@ -104,7 +104,7 @@ impl VarAssign {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct AnonymousFunc {
     pub args: Vec<(String, Expr)>,
     pub rty: String,
@@ -125,7 +125,7 @@ impl AnonymousFunc {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct FuncIdent {
     pub ident: String,
     pub args: Vec<(String, String)>,
@@ -158,7 +158,7 @@ impl FuncIdent {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct FuncBody {
     pub stmt: Vec<Stmt>,
 }
@@ -169,7 +169,7 @@ impl FuncBody {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, PartialOrd)]
 pub struct VarIdent {
     pub ident: String,
     pub expr: Expr,

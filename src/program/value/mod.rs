@@ -1,9 +1,39 @@
 use crate::ast::{CallExpr, Expr};
 use crate::program::environment::LocalEnvironment;
+use crate::program::evaluating_functions::eval_expr;
 use crate::program::function::Function;
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, Div, Mul, Sub};
 use std::sync::{Arc, RwLock};
+
+#[derive(Clone, Debug)]
+pub enum CondType {
+    Eq,
+    Ne,
+    Gt,
+    Lt,
+    Ge,
+    Le,
+}
+
+impl CondType {
+    pub(crate) fn eval_cond(
+        &self,
+        lhs: Box<Expr>,
+        rhs: Box<Expr>,
+        env: Arc<RwLock<LocalEnvironment>>,
+    ) -> bool {
+        match self {
+            CondType::Eq => eval_expr(*lhs, env.clone()) == eval_expr(*rhs, env.clone()),
+            CondType::Ne => eval_expr(*lhs, env.clone()) != eval_expr(*rhs, env.clone()),
+            CondType::Gt => eval_expr(*lhs, env.clone()) > eval_expr(*rhs, env.clone()),
+            CondType::Lt => eval_expr(*lhs, env.clone()) < eval_expr(*rhs, env.clone()),
+            CondType::Ge => eval_expr(*lhs, env.clone()) >= eval_expr(*rhs, env.clone()),
+            CondType::Le => eval_expr(*lhs, env.clone()) <= eval_expr(*rhs, env.clone()),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Value {
@@ -17,8 +47,30 @@ pub enum Value {
     Type(String),
     Range(i64, i64),
     Counter(String, i64, i64),
-    Eq(Box<Expr>, Box<Expr>),
+    Cond(CondType, Box<Expr>, Box<Expr>),
     None,
+}
+
+macro_rules! impl_partial_ord {
+    ($a: expr, $b: expr) => {
+        if $a > $b {
+            Some(Ordering::Greater)
+        } else if $a < $b {
+            Some(Ordering::Less)
+        } else {
+            Some(Ordering::Equal)
+        }
+    };
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match (self, other) {
+            (Value::Int(a), Value::Int(b)) => impl_partial_ord!(a, b),
+            (Value::Bool(a), Value::Bool(b)) => impl_partial_ord!(a, b),
+            (_, _) => None,
+        }
+    }
 }
 
 impl PartialEq for Value {
@@ -106,7 +158,7 @@ impl Value {
             Value::CallFunc { .. } => Value::Type("func".into()),
             Value::Range(s, e) => Value::Type(format!("range<{}, {}>", s, e)),
             Value::Counter(ident, s, e) => Value::Type(format!("counter<{}, {}, {}>", ident, s, e)),
-            Value::Eq(_, _) => Value::Type("bool".into()),
+            Value::Cond(_, _, _) => Value::Type("bool".into()),
             Value::RefValue(r) => r.try_read().unwrap().clone().into_type(),
         }
     }
@@ -125,7 +177,14 @@ impl Display for Value {
             Value::CallFunc(call) => write!(f, "{}", call.get_name()),
             Value::Range(s, e) => write!(f, "range<{}, {}>", s, e),
             Value::Counter(ident, s, e) => write!(f, "counter<{}, {}, {}>", ident, s, e),
-            Value::Eq(a, b) => write!(f, "{}", a == b),
+            Value::Cond(cond_ty, a, b) => match cond_ty {
+                CondType::Eq => write!(f, "{}", a == b),
+                CondType::Ne => write!(f, "{}", a != b),
+                CondType::Gt => write!(f, "{}", a > b),
+                CondType::Lt => write!(f, "{}", a < b),
+                CondType::Ge => write!(f, "{}", a >= b),
+                CondType::Le => write!(f, "{}", a <= b),
+            },
             Value::RefValue(r) => write!(f, "{:?}", r),
         }
     }

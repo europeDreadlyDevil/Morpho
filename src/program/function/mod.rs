@@ -34,7 +34,6 @@ impl Function {
     }
     pub(crate) fn run(&mut self) {
         for stmt in self.body.clone() {
-            //println!("RUN_ENV: {:?}", self.environment);
             match stmt {
                 Stmt::Expr(expr) => match *expr {
                     Expr::Call(call_expr) => call_func(call_expr, self.environment.clone()),
@@ -62,7 +61,15 @@ impl Function {
                         *r.try_write().unwrap() = value;
                         return;
                     }
-                    *self.environment.try_read().unwrap().variables.get(&ident).unwrap().try_write().unwrap() = value;
+                    *self
+                        .environment
+                        .try_read()
+                        .unwrap()
+                        .variables
+                        .get(&ident)
+                        .unwrap()
+                        .try_write()
+                        .unwrap() = value;
                 }
                 _ => panic!("Unhandled statement"),
             }

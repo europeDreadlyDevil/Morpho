@@ -1,11 +1,10 @@
 use crate::ast::{CallExpr, Expr, FuncBody, Prog, Stmt};
 use crate::program::environment::LocalEnvironment;
 use crate::program::function::Function;
-use crate::program::value::Value;
+use crate::program::value::{CondType, Value};
 use crate::program::Program;
 use crate::GLOBAL_ENV;
 use std::collections::HashMap;
-use std::process::id;
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
@@ -79,12 +78,10 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 .insert(ident.clone(), Arc::new(RwLock::new(Value::Func(func))));
             Value::CallFunc(CallExpr::new(ident, call_args))
         }
-        Expr::Eq(l, r) => Value::Eq(l, r),
-        Expr::NotEq(l, r) => {
-            let l = eval_expr(*l, env.clone());
-            let r = eval_expr(*r, env.clone());
-            Value::Bool(l != r)
-        }
+        Expr::Eq(l, r) => Value::Cond(CondType::Eq, l, r),
+        Expr::NotEq(l, r) => Value::Cond(CondType::Ne, l, r),
+        Expr::Gt(l, r) => Value::Cond(CondType::Gt, l, r),
+        Expr::Lt(l, r) => Value::Cond(CondType::Lt, l, r),
         Expr::Add(l, r) => {
             let l = eval_expr(*l, env.clone());
             let r = eval_expr(*r, env.clone());
@@ -157,19 +154,14 @@ macro_rules! macro_extract_func {
                     let (ident, ty) = func.get_args()[i].clone();
                     if Value::Type(ty) == parsed_args[i].clone().into_type() {
                         if let Value::RefValue(r) = parsed_args[i].clone() {
-                            l_env
-                            .try_write()
-                            .unwrap()
-                            .variables
-                            .insert(ident, r);
+                            l_env.try_write().unwrap().variables.insert(ident, r);
                         } else {
                             l_env
-                            .try_write()
-                            .unwrap()
-                            .variables
-                            .insert(ident, Arc::new(RwLock::new(parsed_args[i].clone())));
+                                .try_write()
+                                .unwrap()
+                                .variables
+                                .insert(ident, Arc::new(RwLock::new(parsed_args[i].clone())));
                         }
-
                     } else {
                         panic!("Expected other type")
                     }

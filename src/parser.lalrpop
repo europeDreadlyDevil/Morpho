@@ -46,8 +46,19 @@ VarIdent: VarIdent = {
 };
 
 pub Expr: Expr = {
-    <l: ExprCond> => l,
+    <l: LogicalExpr> => l,
 };
+
+LogicalExpr: Expr = {
+    <l: BitExpr> "||" <r: LogicalExpr> => Expr::Or(Box::new(l), Box::new(r)),
+    <l: BitExpr> "&&" <r: LogicalExpr> => Expr::And(Box::new(l), Box::new(r)),
+    ExprCond
+}
+
+BitExpr: Expr = {
+    <l: ExprCond> "^" <r: BitExpr> => Expr::Xor(Box::new(l), Box::new(r)),
+    ExprCond
+}
 
 ExprCond: Expr = {
     <l: ExprAddSub> "==" <r: ExprCond> => Expr::Eq(Box::new(l), Box::new(r)),
@@ -64,15 +75,17 @@ ExprAddSub: Expr = {
 };
 
 ExprMulDiv: Expr = {
-    <l: ExprFactor> "*" <r: ExprMulDiv> => Expr::Mul(Box::new(l), Box::new(r)),
-    <l: ExprFactor> "/" <r: ExprMulDiv> => Expr::Div(Box::new(l), Box::new(r)),
-    ExprFactor,
+    <l: UnaryExpr> "*" <r: ExprMulDiv> => Expr::Mul(Box::new(l), Box::new(r)),
+    <l: UnaryExpr> "/" <r: ExprMulDiv> => Expr::Div(Box::new(l), Box::new(r)),
+    <l: UnaryExpr> "%" <r: ExprMulDiv> => Expr::Mod(Box::new(l), Box::new(r)),
+    UnaryExpr,
 };
 
-ExprFactor: Expr = {
-    "(" <e: Expr> ")" => e,
-    <expr: PrimitiveExpr> => expr,
-};
+UnaryExpr: Expr = {
+    "!" <expr: PrimitiveExpr> => Expr::Not(Box::new(expr)),
+    "-" <expr: PrimitiveExpr> => Expr::Neg(Box::new(expr)),
+    PrimitiveExpr
+}
 
 PrimitiveExpr: Expr = {
     <id: Ident> => Expr::Ident(id),
@@ -88,6 +101,7 @@ PrimitiveExpr: Expr = {
     <range: Range> => Expr::Range(range),
     <anon_func: AnonymousFunc> => Expr::AnonFunc(anon_func),
     "&" <r: PrimitiveExpr> => Expr::Ref(Box::new(r)),
+    "(" <e: Expr> ")" => e,
 }
 
 Range: (i64, i64) = {
@@ -122,12 +136,12 @@ pub Ident: String = {
 
 // Целые числа
 pub Integer: i64 = {
-    <int:r"-?[0-9]+"> => int.parse().unwrap(),
+    <int:r"[0-9]+"> => int.parse().unwrap(),
 };
 
 // Числа с плавающей точкой
 pub Float: f64 = {
-    <float:r"-?[0-9]+\.[0-9]+"> => float.parse().unwrap(),
+    <float:r"[0-9]+\.[0-9]+"> => float.parse().unwrap(),
 };
 
 // Булевы значения

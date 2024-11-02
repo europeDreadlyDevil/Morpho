@@ -5,6 +5,16 @@ use func_lang::program::evaluating_functions::eval_program;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
+use lazy_static::lazy_static;
+
+lazy_static!(
+    static ref CODE: String = {
+        let path = CLI::parse().path_to_file;
+        let mut buf = String::new();
+        File::open(path).unwrap().read_to_string(&mut buf).unwrap();
+        buf
+    };
+);
 
 #[derive(Parser, Clone)]
 #[command()]
@@ -13,9 +23,6 @@ struct CLI {
 }
 
 fn main() -> Result<()> {
-    let path = CLI::parse().path_to_file;
-    let mut buf = String::new();
-    File::open(path)?.read_to_string(&mut buf)?;
-    let ast = ProgParser::new().parse(buf.leak())?;
+    let ast = ProgParser::new().parse(&CODE)?;
     eval_program(ast)
 }

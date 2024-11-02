@@ -5,6 +5,7 @@ use crate::program::value::{CondType, Value};
 use crate::program::Program;
 use crate::GLOBAL_ENV;
 use std::collections::HashMap;
+use std::ops::{Neg, Not};
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
@@ -36,7 +37,6 @@ pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
 }
 
 pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
-    //println!("EVAL_EXPR: {expr:?} {env:?}");
     match expr {
         Expr::Ident(ident) => env
             .try_read()
@@ -121,6 +121,29 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
             ),
             _ => Value::RefValue(Arc::new(RwLock::new(eval_expr(*expr, env.clone())))),
         },
+        Expr::Not(expr) => {
+            let rhs = eval_expr(*expr, env.clone());
+            rhs.not()
+        }
+        Expr::Neg(expr) => {
+            let rhs = eval_expr(*expr, env.clone());
+            rhs.neg()
+        }
+        Expr::Or(l, r) => {
+            let l = eval_expr(*l, env.clone());
+            let r = eval_expr(*r, env.clone());
+            l.logical_or(r)
+        }
+        Expr::And(l, r) => {
+            let l = eval_expr(*l, env.clone());
+            let r = eval_expr(*r, env.clone());
+            l.logical_and(r)
+        }
+        Expr::Mod(l, r ) => {
+            let l = eval_expr(*l, env.clone());
+            let r = eval_expr(*r, env.clone());
+            l%r
+        }
         _ => eval_primitive_expr(expr, env.clone()),
     }
 }

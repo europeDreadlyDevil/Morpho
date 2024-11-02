@@ -4,11 +4,11 @@ use crate::program::value::Value;
 use crate::GLOBAL_ENV;
 use std::sync::{Arc, RwLock};
 
-pub fn print_func(args: Vec<Value>, _env: Arc<RwLock<LocalEnvironment>>) -> Value {
+pub fn print_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     for i in 0..args.len() - 1 {
-        print!("{} ", args[i]);
+        args[i].print(env.clone())
     }
-    println!("{}", args[args.len() - 1]);
+    args[args.len() - 1].println(env);
     Value::None
 }
 

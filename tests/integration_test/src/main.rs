@@ -18,6 +18,7 @@ fn main() -> Result<()> {
     for_block()?;
     for_block_with_anon_func()?;
     for_block_with_anon_func_and_ref()?;
+    print_not_and_neg_value()?;
     Ok(())
 }
 
@@ -116,6 +117,14 @@ fn for_block_with_anon_func_and_ref() -> Result<()> {
     log!(Level::Info, "Starting for_block_with_anon_func_and_ref...");
     let ast = ProgParser::new()
         .parse(r#"func main = () { let a = 10; for(i in 0..10, $|a: &a, i: i| {a = a + a; print(i+1, ":", a);});}"#)?;
+    eval_program(ast).unwrap();
+    Ok(())
+}
+
+fn print_not_and_neg_value() -> Result<()> {
+    log!(Level::Info, "Starting print_not_and_neg_value...");
+    let ast = ProgParser::new()
+        .parse(r#"func main = () { print(-10); print(!true); let a = 10; print(-a); let b = true; print(!b); }"#)?;
     eval_program(ast).unwrap();
     Ok(())
 }

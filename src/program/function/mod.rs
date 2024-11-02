@@ -40,7 +40,10 @@ impl Function {
                     _ => panic!("Unhandled expression"),
                 },
                 Stmt::VarIdent(VarIdent { ident, expr }) => {
-                    let value = eval_expr(expr, self.environment.clone());
+                    let value = eval_expr(expr.clone(), self.environment.clone());
+                    let value = if let Value::Cond(ty, l , r) = value {
+                        Value::Bool(ty.eval_cond(l, r, self.environment.clone()))
+                    } else { value };
                     (*self.environment.try_write().unwrap())
                         .variables
                         .insert(ident, Arc::new(RwLock::new(value)));

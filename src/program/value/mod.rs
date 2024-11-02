@@ -4,7 +4,7 @@ use crate::program::evaluating_functions::eval_expr;
 use crate::program::function::Function;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, BitOr, Div, Mul, Neg, Not, Rem, Sub};
 use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug)]
@@ -49,6 +49,39 @@ pub enum Value {
     Counter(String, i64, i64),
     Cond(CondType, Box<Expr>, Box<Expr>),
     None,
+}
+
+impl Neg for Value {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Value::Int(i) => Value::Int(i.neg()),
+            Value::RefValue(r) => {
+                let mut value = r.try_write().unwrap();
+                *value = -value.clone();
+                Value::None
+            }
+            _ => Value::None
+        }
+    }
+}
+
+impl Not for Value {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Value::Int(i) => Value::Int(!i),
+            Value::Bool(b) => Value::Bool(!b),
+            Value::RefValue(r) => {
+                let mut value = r.try_write().unwrap();
+                *value = !value.clone();
+                Value::None
+            }
+            _ => Value::None
+        }
+    }
 }
 
 macro_rules! impl_partial_ord {
@@ -118,6 +151,20 @@ impl Sub for Value {
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
+                    _ => Value::None,
+                }
+            }
+            (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
+                Value::Int(a) => Value::Int(a - b),
+                _ => Value::None,
+            },
+            (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Int(b) => Value::Int(a - b),
+                _ => Value::None,
+            },
             _ => Value::None,
         }
     }
@@ -129,6 +176,20 @@ impl Mul for Value {
     fn mul(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+                    _ => Value::None,
+                }
+            }
+            (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
+                Value::Int(a) => Value::Int(a * b),
+                _ => Value::None,
+            },
+            (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Int(b) => Value::Int(a * b),
+                _ => Value::None,
+            },
             _ => Value::None,
         }
     }
@@ -140,6 +201,45 @@ impl Div for Value {
     fn div(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
             (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
+                    _ => Value::None,
+                }
+            }
+            (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
+                Value::Int(a) => Value::Int(a / b),
+                _ => Value::None,
+            },
+            (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Int(b) => Value::Int(a / b),
+                _ => Value::None,
+            },
+            _ => Value::None,
+        }
+    }
+}
+
+impl Rem for Value {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a % b),
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a % b),
+                    _ => Value::None,
+                }
+            }
+            (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
+                Value::Int(a) => Value::Int(a % b),
+                _ => Value::None,
+            },
+            (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Int(b) => Value::Int(a % b),
+                _ => Value::None,
+            },
             _ => Value::None,
         }
     }
@@ -162,6 +262,73 @@ impl Value {
             Value::RefValue(r) => r.try_read().unwrap().clone().into_type(),
         }
     }
+
+    pub fn logical_or(self, other: Value) -> Value {
+        match (self, other) {
+            (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
+            (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
+                Value::Bool(a) => Value::Bool(a || b),
+                _ => Value::None,
+            }
+            (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Bool(b) => Value::Bool(a || b),
+                _ => Value::None,
+            }
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
+                    _ => Value::None,
+                }
+            }
+            (_, _) => panic!("Expected bool type")
+        }
+    }
+    pub fn logical_and(self, other: Value) -> Value {
+        match (self, other) {
+            (Value::Bool(a), Value::Bool(b)) => Value::Bool(a && b),
+            (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
+                Value::Bool(a) => Value::Bool(a && b),
+                _ => Value::None,
+            }
+            (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Bool(b) => Value::Bool(a && b),
+                _ => Value::None,
+            }
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Bool(a), Value::Bool(b)) => Value::Bool(a && b),
+                    _ => Value::None,
+                }
+            }
+            (_, _) => panic!("Expected bool type")
+        }
+    }
+    pub fn print(&self, env: Arc<RwLock<LocalEnvironment>>) {
+        match self {
+            Value::Cond(cond_ty, a, b) => match cond_ty {
+                CondType::Eq => print!("{}", eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)),
+                CondType::Ne => print!("{}", eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)),
+                CondType::Gt => print!("{}", eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)),
+                CondType::Lt => print!("{}", eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)),
+                CondType::Ge => print!("{}", eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)),
+                CondType::Le => print!("{}", eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)),
+            },
+            _ => print!("{self}")
+        }
+    }
+    pub fn println(&self, env: Arc<RwLock<LocalEnvironment>>) {
+        match self {
+            Value::Cond(cond_ty, a, b) => match cond_ty {
+                CondType::Eq => println!("{}", eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)),
+                CondType::Ne => println!("{}", eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)),
+                CondType::Gt => println!("{}", eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)),
+                CondType::Lt => println!("{}", eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)),
+                CondType::Ge => println!("{}", eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)),
+                CondType::Le => println!("{}", eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)),
+            },
+            _ => println!("{self}")
+        }
+    }
 }
 
 impl Display for Value {
@@ -177,15 +344,8 @@ impl Display for Value {
             Value::CallFunc(call) => write!(f, "{}", call.get_name()),
             Value::Range(s, e) => write!(f, "range<{}, {}>", s, e),
             Value::Counter(ident, s, e) => write!(f, "counter<{}, {}, {}>", ident, s, e),
-            Value::Cond(cond_ty, a, b) => match cond_ty {
-                CondType::Eq => write!(f, "{}", a == b),
-                CondType::Ne => write!(f, "{}", a != b),
-                CondType::Gt => write!(f, "{}", a > b),
-                CondType::Lt => write!(f, "{}", a < b),
-                CondType::Ge => write!(f, "{}", a >= b),
-                CondType::Le => write!(f, "{}", a <= b),
-            },
             Value::RefValue(r) => write!(f, "{:?}", r),
+            _ => write!(f, "Not printable")
         }
     }
 }

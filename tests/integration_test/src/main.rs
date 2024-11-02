@@ -19,6 +19,7 @@ fn main() -> Result<()> {
     for_block_with_anon_func()?;
     for_block_with_anon_func_and_ref()?;
     print_not_and_neg_value()?;
+    evaluating_fibonacci_nums()?;
     Ok(())
 }
 
@@ -77,7 +78,7 @@ fn eval_expr_in_func() -> Result<()> {
 fn eval_expr_in_func_with_vars() -> Result<()> {
     log!(Level::Info, "Starting eval_expr_in_func_with_vars...");
     let ast = ProgParser::new()
-        .parse(r#"func main = () { let x1 = 60; let x2 = 30; let y = x1 * x2; print(x1, x2, y, x1-x2); }"#)?;
+        .parse(r#"func main = () { let x1 = 60; let x2 = 30; let y = x1 * x2; print(x1, " ", x2," ", y, " ", x1-x2); }"#)?;
     eval_program(ast).unwrap();
     Ok(())
 }
@@ -125,6 +126,14 @@ fn print_not_and_neg_value() -> Result<()> {
     log!(Level::Info, "Starting print_not_and_neg_value...");
     let ast = ProgParser::new()
         .parse(r#"func main = () { print(-10); print(!true); let a = 10; print(-a); let b = true; print(!b); }"#)?;
+    eval_program(ast).unwrap();
+    Ok(())
+}
+
+fn evaluating_fibonacci_nums() -> Result<()> {
+    log!(Level::Info, "Starting evaluating_fibonacci_nums...");
+    let ast = ProgParser::new()
+        .parse(r#"func main = () {print(fibonacci(11));} func fibonacci = (n: int) -> int {return if(n == 0,$|| -> int { return 0; },$if |n == 1 || n == 2,$|| -> int { return 1; },$|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); }|);}"#)?;
     eval_program(ast).unwrap();
     Ok(())
 }

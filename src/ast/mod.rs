@@ -24,12 +24,14 @@ pub enum Expr {
     AnonFunc(AnonymousFunc),
     Gt(Box<Expr>, Box<Expr>),
     Lt(Box<Expr>, Box<Expr>),
+    Ge(Box<Expr>, Box<Expr>),
+    Le(Box<Expr>, Box<Expr>),
     Or(Box<Expr>, Box<Expr>),
     And(Box<Expr>, Box<Expr>),
     Not(Box<Expr>),
     Neg(Box<Expr>),
     Xor(Box<Expr>, Box<Expr>),
-    Mod(Box<Expr>, Box<Expr>)
+    Mod(Box<Expr>, Box<Expr>),
 }
 
 impl PartialEq for Expr {
@@ -95,6 +97,7 @@ pub enum Stmt {
     FuncBody(FuncBody),
     VarIdent(VarIdent),
     VarAssign(VarAssign),
+    ReturnValue(Box<Expr>),
     Expr(Box<Expr>),
 }
 

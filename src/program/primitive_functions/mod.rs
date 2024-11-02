@@ -28,10 +28,10 @@ fn extract_value(value: Value, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 .get(&call_expr.get_name())
             {
                 if let Value::FuncPtr(func) = func.try_read().unwrap().clone() {
-                    return func(parsed_args, env.clone());
+                    return func(parsed_args, env.clone())
                 }
             }
-            call_func(call_expr, env.clone());
+            return call_func(call_expr, env.clone())
         }
         _ => {}
     }
@@ -47,11 +47,19 @@ pub fn if_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 extract_value(args[2].clone(), env.clone())
             }
         }
+        Value::Bool(b) => {
+            if b {
+                extract_value(args[1].clone(), env.clone())
+            } else {
+                extract_value(args[2].clone(), env.clone())
+            }
+        }
         _ => Value::None
     }
 }
 
 pub fn for_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
+    //println!("ARGS: {args:?}");
     match args[0].clone() {
         Value::Range(start, end) => {
             if let Value::CallFunc(call_expr) = args[1].clone() {

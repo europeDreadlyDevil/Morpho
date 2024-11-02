@@ -10,6 +10,7 @@ pub Stmt: Stmt = {
     <func: FuncIdent> => Stmt::FuncIdent(func),
     <var: VarIdent> ";" => Stmt::VarIdent(var),
     <assign: VarAssign> ";" => Stmt::VarAssign(assign),
+    "return" <expr: Expr> ";" => Stmt::ReturnValue(Box::new(expr)),
     <expr: Expr> ";" => Stmt::Expr(Box::new(expr)),
 };
 
@@ -27,6 +28,8 @@ FuncIdent: FuncIdent = {
 AnonymousFunc: AnonymousFunc = {
     "$|" <args: Comma<AnonymousFuncArg>> "|" <body: FuncBody>
             => AnonymousFunc::new_wo_rty(args, Some(body)),
+    "$|" <args: Comma<AnonymousFuncArg>> "|" "->" <rtype: Type> <body: FuncBody>
+            => AnonymousFunc::new_w_rty(args, rtype, Some(body)),
 }
 
 AnonymousFuncArg: (String, Expr) = {
@@ -52,7 +55,7 @@ pub Expr: Expr = {
 LogicalExpr: Expr = {
     <l: BitExpr> "||" <r: LogicalExpr> => Expr::Or(Box::new(l), Box::new(r)),
     <l: BitExpr> "&&" <r: LogicalExpr> => Expr::And(Box::new(l), Box::new(r)),
-    ExprCond
+    BitExpr
 }
 
 BitExpr: Expr = {
@@ -65,6 +68,8 @@ ExprCond: Expr = {
     <l: ExprAddSub> "!=" <r: ExprCond> => Expr::NotEq(Box::new(l), Box::new(r)),
     <l: ExprAddSub> ">" <r: ExprCond> => Expr::Gt(Box::new(l), Box::new(r)),
     <l: ExprAddSub> "<" <r: ExprCond> => Expr::Lt(Box::new(l), Box::new(r)),
+    <l: ExprAddSub> ">=" <r: ExprCond> => Expr::Ge(Box::new(l), Box::new(r)),
+    <l: ExprAddSub> "<=" <r: ExprCond> => Expr::Le(Box::new(l), Box::new(r)),
     ExprAddSub
 }
 

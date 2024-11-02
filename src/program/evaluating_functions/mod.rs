@@ -37,6 +37,7 @@ pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
 }
 
 pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
+    //println!("EXPR: {expr:?}");
     match expr {
         Expr::Ident(ident) => env
             .try_read()
@@ -49,8 +50,7 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
             .unwrap()
             .clone(),
         Expr::Call(call_expr) => {
-            call_func(call_expr, env);
-            Value::None
+            call_func(call_expr, env)
         }
         Expr::Func(f_ptr) => {
             Value::CallFunc(CallExpr::new(f_ptr.ident.clone(), f_ptr.args.unwrap()))
@@ -82,6 +82,8 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
         Expr::NotEq(l, r) => Value::Cond(CondType::Ne, l, r),
         Expr::Gt(l, r) => Value::Cond(CondType::Gt, l, r),
         Expr::Lt(l, r) => Value::Cond(CondType::Lt, l, r),
+        Expr::Ge(l, r) => Value::Cond(CondType::Ge, l, r),
+        Expr::Le(l, r) => Value::Cond(CondType::Le, l, r),
         Expr::Add(l, r) => {
             let l = eval_expr(*l, env.clone());
             let r = eval_expr(*r, env.clone());
@@ -132,7 +134,7 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
         Expr::Or(l, r) => {
             let l = eval_expr(*l, env.clone());
             let r = eval_expr(*r, env.clone());
-            l.logical_or(r)
+            l.logical_or(r, env.clone())
         }
         Expr::And(l, r) => {
             let l = eval_expr(*l, env.clone());
@@ -143,6 +145,11 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
             let l = eval_expr(*l, env.clone());
             let r = eval_expr(*r, env.clone());
             l%r
+        }
+        Expr::Xor(l, r ) => {
+            let l = eval_expr(*l, env.clone());
+            let r = eval_expr(*r, env.clone());
+            l^r
         }
         _ => eval_primitive_expr(expr, env.clone()),
     }
@@ -166,10 +173,10 @@ macro_rules! macro_extract_func {
         for arg in args {
             parsed_args.push(eval_expr(arg, env.clone()));
         }
-        //println!("PARSED_ARGS {:?}", parsed_args);
-        match $expr.try_read().unwrap().clone() {
+
+        return match $expr.try_read().unwrap().clone() {
             Value::FuncPtr(func) => {
-                func(parsed_args, env.clone());
+                func(parsed_args, env.clone())
             }
             Value::Func(mut func) => {
                 let mut l_env = Arc::new(RwLock::new(LocalEnvironment::new()));
@@ -191,13 +198,14 @@ macro_rules! macro_extract_func {
                 }
                 func.set_env(l_env);
                 func.run()
+
             }
-            _ => {}
+            _ => panic!("Expected func")
         };
-    }};
+    }}
 }
 
-pub fn call_func(call_expr: CallExpr, env: Arc<RwLock<LocalEnvironment>>) {
+pub fn call_func(call_expr: CallExpr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     let ident = call_expr.get_name();
     match GLOBAL_ENV
         .try_read()

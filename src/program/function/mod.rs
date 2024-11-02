@@ -32,11 +32,11 @@ impl Function {
             body,
         }
     }
-    pub(crate) fn run(&mut self) {
+    pub(crate) fn run(&mut self) -> Value {
         for stmt in self.body.clone() {
             match stmt {
                 Stmt::Expr(expr) => match *expr {
-                    Expr::Call(call_expr) => call_func(call_expr, self.environment.clone()),
+                    Expr::Call(call_expr) => { call_func(call_expr, self.environment.clone()); },
                     _ => panic!("Unhandled expression"),
                 },
                 Stmt::VarIdent(VarIdent { ident, expr }) => {
@@ -50,6 +50,9 @@ impl Function {
                 }
                 Stmt::VarAssign(VarAssign { ident, expr }) => {
                     let value = eval_expr(expr, self.environment.clone());
+                    let value = if let Value::Cond(ty, l , r) = value {
+                        Value::Bool(ty.eval_cond(l, r, self.environment.clone()))
+                    } else { value };
                     if let Value::RefValue(r) = self
                         .environment
                         .try_read()
@@ -62,7 +65,7 @@ impl Function {
                         .clone()
                     {
                         *r.try_write().unwrap() = value;
-                        return;
+                        continue;
                     }
                     *self
                         .environment
@@ -74,9 +77,17 @@ impl Function {
                         .try_write()
                         .unwrap() = value;
                 }
+                Stmt::ReturnValue(expr) => {
+                    let value = eval_expr(*expr, self.environment.clone());
+                    if value.clone().into_type() == Value::Type(self.rty.clone()) {
+                        return value
+                    }
+                    panic!("Excepted other returning type");
+                }
                 _ => panic!("Unhandled statement"),
-            }
+            };
         }
+        Value::None
     }
 
     pub(crate) fn get_ident(&self) -> &str {

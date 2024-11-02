@@ -24,5 +24,6 @@ struct CLI {
 
 fn main() -> Result<()> {
     let ast = ProgParser::new().parse(&CODE)?;
+    //println!("{ast:?}");
     eval_program(ast)
 }

@@ -4,7 +4,7 @@ use crate::program::evaluating_functions::eval_expr;
 use crate::program::function::Function;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
-use std::ops::{Add, BitOr, Div, Mul, Neg, Not, Rem, Sub};
+use std::ops::{Add, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Sub};
 use std::sync::{Arc, RwLock};
 
 #[derive(Clone, Debug)]
@@ -245,6 +245,31 @@ impl Rem for Value {
     }
 }
 
+impl BitXor for Value {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Int(a), Value::Int(b)) => Value::Int(a ^ b),
+            (Value::RefValue(a), Value::RefValue(b)) => {
+                match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
+                    (Value::Int(a), Value::Int(b)) => Value::Int(a ^ b),
+                    _ => Value::None,
+                }
+            }
+            (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
+                Value::Int(a) => Value::Int(a ^ b),
+                _ => Value::None,
+            },
+            (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Int(b) => Value::Int(a ^ b),
+                _ => Value::None,
+            },
+            _ => Value::None,
+        }
+    }
+}
+
 impl Value {
     pub(crate) fn into_type(self) -> Value {
         match self {
@@ -263,7 +288,7 @@ impl Value {
         }
     }
 
-    pub fn logical_or(self, other: Value) -> Value {
+    pub fn logical_or(self, other: Value, env: Arc<RwLock<LocalEnvironment>>) -> Value {
         match (self, other) {
             (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
             (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
@@ -279,6 +304,9 @@ impl Value {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
                     _ => Value::None,
                 }
+            }
+            (Value::Cond(ty1, l1,r1), Value::Cond(ty2, l2,r2)) => {
+                Value::Bool(ty1.eval_cond(l1,r1, env.clone()) || ty2.eval_cond(l2,r2, env.clone()))
             }
             (_, _) => panic!("Expected bool type")
         }

@@ -4,6 +4,7 @@ use crate::program::value::Value;
 use crate::GLOBAL_ENV;
 use std::sync::{Arc, RwLock};
 
+#[inline]
 pub fn print_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     for i in 0..args.len() - 1 {
         args[i].print(env.clone())
@@ -12,9 +13,10 @@ pub fn print_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value
     Value::None
 }
 
+#[inline]
 fn extract_value(value: Value, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     match value {
-        Value::CallFunc( call_expr) => {
+        Value::CallFunc(call_expr) => {
             let mut parsed_args = vec![];
 
             for arg in call_expr.get_args() {
@@ -28,16 +30,17 @@ fn extract_value(value: Value, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 .get(&call_expr.get_name())
             {
                 if let Value::FuncPtr(func) = func.try_read().unwrap().clone() {
-                    return func(parsed_args, env.clone())
+                    return func(parsed_args, env.clone());
                 }
             }
-            return call_func(call_expr, env.clone())
+            return call_func(call_expr, env.clone());
         }
         _ => {}
     }
     Value::None
 }
 
+#[inline]
 pub fn if_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     match args[0].clone() {
         Value::Cond(ty, a, b) => {
@@ -54,10 +57,11 @@ pub fn if_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 extract_value(args[2].clone(), env.clone())
             }
         }
-        _ => Value::None
+        _ => Value::None,
     }
 }
 
+#[inline]
 pub fn for_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     //println!("ARGS: {args:?}");
     match args[0].clone() {

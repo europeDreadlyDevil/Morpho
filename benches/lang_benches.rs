@@ -46,7 +46,7 @@ fn bench_for_block_with_anon_func_and_ref(c: &mut Criterion) {
 
 fn bench_evaluating_fibonacci_5(c: &mut Criterion) {
     let ast = ProgParser::new()
-        .parse(r#"func main = () {print(fibonacci(5));} func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
+        .parse(r#"func main = () { fibonacci(5); } func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
     c.bench_function("bench_evaluating_fibonacci_5", |b| {
         b.iter(|| {
             eval_program(ast.clone()).unwrap();
@@ -56,7 +56,7 @@ fn bench_evaluating_fibonacci_5(c: &mut Criterion) {
 
 fn bench_evaluating_fibonacci_10(c: &mut Criterion) {
     let ast = ProgParser::new()
-        .parse(r#"func main = () {print(fibonacci(10));} func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
+        .parse(r#"func main = () { fibonacci(10); } func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
     c.bench_function("bench_evaluating_fibonacci_10", |b| {
         b.iter(|| {
             eval_program(ast.clone()).unwrap();
@@ -66,7 +66,7 @@ fn bench_evaluating_fibonacci_10(c: &mut Criterion) {
 
 fn bench_evaluating_fibonacci_20(c: &mut Criterion) {
     let ast = ProgParser::new()
-        .parse(r#"func main = () {print(fibonacci(20));} func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
+        .parse(r#"func main = () { fibonacci(20);} func fibonacci = (n: int) -> int {return if(n <= 1, $|n: n| -> int { return n; }, $|n: n| -> int { return fibonacci(n-1) + fibonacci(n-2); });}"#).unwrap();
     c.bench_function("bench_evaluating_fibonacci_20", |b| {
         b.iter(|| {
             eval_program(ast.clone()).unwrap();
@@ -76,7 +76,7 @@ fn bench_evaluating_fibonacci_20(c: &mut Criterion) {
 
 fn bench_evaluating_fibonacci_iter_20(c: &mut Criterion) {
     let ast = ProgParser::new()
-        .parse(r#"func main = () { let a = 0; let b = 1; for(0..19, $|a: &a, b: &b | { let temp = b; b = a + b; a = temp; }); print(b); }"#).unwrap();
+        .parse(r#"func main = () { let a = 0; let b = 1; for(0..19, $|a: &a, b: &b | { let temp = b; b = a + b; a = temp; }); }"#).unwrap();
     c.bench_function("bench_evaluating_fibonacci_iter_20", |b| {
         b.iter(|| {
             eval_program(ast.clone()).unwrap();

@@ -36,23 +36,29 @@ impl Function {
         for stmt in self.body.clone() {
             match stmt {
                 Stmt::Expr(expr) => match *expr {
-                    Expr::Call(call_expr) => { call_func(call_expr, self.environment.clone()); },
+                    Expr::Call(call_expr) => {
+                        call_func(call_expr, self.environment.clone());
+                    }
                     _ => panic!("Unhandled expression"),
                 },
                 Stmt::VarIdent(VarIdent { ident, expr }) => {
                     let value = eval_expr(expr.clone(), self.environment.clone());
-                    let value = if let Value::Cond(ty, l , r) = value {
+                    let value = if let Value::Cond(ty, l, r) = value {
                         Value::Bool(ty.eval_cond(l, r, self.environment.clone()))
-                    } else { value };
+                    } else {
+                        value
+                    };
                     (*self.environment.try_write().unwrap())
                         .variables
                         .insert(ident, Arc::new(RwLock::new(value)));
                 }
                 Stmt::VarAssign(VarAssign { ident, expr }) => {
                     let value = eval_expr(expr, self.environment.clone());
-                    let value = if let Value::Cond(ty, l , r) = value {
+                    let value = if let Value::Cond(ty, l, r) = value {
                         Value::Bool(ty.eval_cond(l, r, self.environment.clone()))
-                    } else { value };
+                    } else {
+                        value
+                    };
                     if let Value::RefValue(r) = self
                         .environment
                         .try_read()
@@ -80,7 +86,7 @@ impl Function {
                 Stmt::ReturnValue(expr) => {
                     let value = eval_expr(*expr, self.environment.clone());
                     if value.clone().into_type() == Value::Type(self.rty.clone()) {
-                        return value
+                        return value;
                     }
                     panic!("Excepted other returning type");
                 }

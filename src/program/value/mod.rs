@@ -15,6 +15,8 @@ pub enum CondType {
     Lt,
     Ge,
     Le,
+    Or,
+    And
 }
 
 impl CondType {
@@ -31,6 +33,12 @@ impl CondType {
             CondType::Lt => eval_expr(*lhs, env.clone()) < eval_expr(*rhs, env.clone()),
             CondType::Ge => eval_expr(*lhs, env.clone()) >= eval_expr(*rhs, env.clone()),
             CondType::Le => eval_expr(*lhs, env.clone()) <= eval_expr(*rhs, env.clone()),
+            CondType::Or => if let Value::Bool(b) = eval_expr(*lhs, env.clone()).logical_or(eval_expr(*rhs, env.clone()), env) {
+                b
+            } else { panic!("Expected bool type") }
+            CondType::And => if let Value::Bool(b) = eval_expr(*lhs, env.clone()).logical_and(eval_expr(*rhs, env.clone())) {
+                b
+            } else { panic!("Expected bool type") }
         }
     }
 }
@@ -40,6 +48,7 @@ pub enum Value {
     String(String),
     Int(i64),
     Bool(bool),
+    Float(f64),
     FuncPtr(fn(Vec<Value>, Arc<RwLock<LocalEnvironment>>) -> Value),
     RefValue(Arc<RwLock<Value>>),
     Func(Function),
@@ -62,7 +71,7 @@ impl Neg for Value {
                 *value = -value.clone();
                 Value::None
             }
-            _ => Value::None
+            _ => Value::None,
         }
     }
 }
@@ -79,7 +88,7 @@ impl Not for Value {
                 *value = !value.clone();
                 Value::None
             }
-            _ => Value::None
+            _ => Value::None,
         }
     }
 }
@@ -125,19 +134,28 @@ impl Add for Value {
 
     fn add(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
                     _ => Value::None,
                 }
             }
+            (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a + b),
                 _ => Value::None,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a + b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
+            (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
+                Value::Float(a) => Value::Float(a + b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Float(b) => Value::Float(a + b),
                 _ => Value::None,
             },
             _ => Value::None,
@@ -150,19 +168,28 @@ impl Sub for Value {
 
     fn sub(self, rhs: Self) -> Self::Output {
         match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
                     _ => Value::None,
                 }
             }
+            (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a - b),
                 _ => Value::None,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a - b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
+            (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
+                Value::Float(a) => Value::Float(a - b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Float(b) => Value::Float(a - b),
                 _ => Value::None,
             },
             _ => Value::None,
@@ -190,6 +217,15 @@ impl Mul for Value {
                 Value::Int(b) => Value::Int(a * b),
                 _ => Value::None,
             },
+            (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
+            (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
+                Value::Float(a) => Value::Float(a * b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Float(b) => Value::Float(a * b),
+                _ => Value::None,
+            },
             _ => Value::None,
         }
     }
@@ -215,6 +251,15 @@ impl Div for Value {
                 Value::Int(b) => Value::Int(a / b),
                 _ => Value::None,
             },
+            (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
+            (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
+                Value::Float(a) => Value::Float(a / b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Float(b) => Value::Float(a / b),
+                _ => Value::None,
+            },
             _ => Value::None,
         }
     }
@@ -238,6 +283,15 @@ impl Rem for Value {
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a % b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
+            (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
+                Value::Float(a) => Value::Float(a % b),
+                _ => Value::None,
+            },
+            (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
+                Value::Float(b) => Value::Float(a % b),
                 _ => Value::None,
             },
             _ => Value::None,
@@ -285,6 +339,7 @@ impl Value {
             Value::Counter(ident, s, e) => Value::Type(format!("counter<{}, {}, {}>", ident, s, e)),
             Value::Cond(_, _, _) => Value::Type("bool".into()),
             Value::RefValue(r) => r.try_read().unwrap().clone().into_type(),
+            Value::Float(_) => Value::Type("float".into())
         }
     }
 
@@ -294,21 +349,21 @@ impl Value {
             (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
                 Value::Bool(a) => Value::Bool(a || b),
                 _ => Value::None,
-            }
+            },
             (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Bool(b) => Value::Bool(a || b),
                 _ => Value::None,
-            }
+            },
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
                     _ => Value::None,
                 }
             }
-            (Value::Cond(ty1, l1,r1), Value::Cond(ty2, l2,r2)) => {
-                Value::Bool(ty1.eval_cond(l1,r1, env.clone()) || ty2.eval_cond(l2,r2, env.clone()))
-            }
-            (_, _) => panic!("Expected bool type")
+            (Value::Cond(ty1, l1, r1), Value::Cond(ty2, l2, r2)) => Value::Bool(
+                ty1.eval_cond(l1, r1, env.clone()) || ty2.eval_cond(l2, r2, env.clone()),
+            ),
+            (_, _) => panic!("Expected bool type"),
         }
     }
     pub fn logical_and(self, other: Value) -> Value {
@@ -317,44 +372,96 @@ impl Value {
             (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
                 Value::Bool(a) => Value::Bool(a && b),
                 _ => Value::None,
-            }
+            },
             (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Bool(b) => Value::Bool(a && b),
                 _ => Value::None,
-            }
+            },
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(a && b),
                     _ => Value::None,
                 }
             }
-            (_, _) => panic!("Expected bool type")
+            (_, _) => panic!("Expected bool type"),
         }
     }
     pub fn print(&self, env: Arc<RwLock<LocalEnvironment>>) {
         match self {
             Value::Cond(cond_ty, a, b) => match cond_ty {
-                CondType::Eq => print!("{}", eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)),
-                CondType::Ne => print!("{}", eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)),
-                CondType::Gt => print!("{}", eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)),
-                CondType::Lt => print!("{}", eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)),
-                CondType::Ge => print!("{}", eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)),
-                CondType::Le => print!("{}", eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)),
+                CondType::Eq => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)
+                ),
+                CondType::Ne => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)
+                ),
+                CondType::Gt => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)
+                ),
+                CondType::Lt => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)
+                ),
+                CondType::Ge => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)
+                ),
+                CondType::Le => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)
+                ),
+                CondType::Or => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()).logical_or(eval_expr(*b.clone(), env.clone()), env)
+                ),
+                CondType::And => print!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()).logical_and(eval_expr(*b.clone(), env))
+                ),
             },
-            _ => print!("{self}")
+            _ => print!("{self}"),
         }
     }
     pub fn println(&self, env: Arc<RwLock<LocalEnvironment>>) {
         match self {
             Value::Cond(cond_ty, a, b) => match cond_ty {
-                CondType::Eq => println!("{}", eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)),
-                CondType::Ne => println!("{}", eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)),
-                CondType::Gt => println!("{}", eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)),
-                CondType::Lt => println!("{}", eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)),
-                CondType::Ge => println!("{}", eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)),
-                CondType::Le => println!("{}", eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)),
+                CondType::Eq => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) == eval_expr(*b.clone(), env)
+                ),
+                CondType::Ne => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) != eval_expr(*b.clone(), env)
+                ),
+                CondType::Gt => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) > eval_expr(*b.clone(), env)
+                ),
+                CondType::Lt => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) < eval_expr(*b.clone(), env)
+                ),
+                CondType::Ge => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) >= eval_expr(*b.clone(), env)
+                ),
+                CondType::Le => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()) <= eval_expr(*b.clone(), env)
+                ),
+                CondType::Or => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()).logical_or(eval_expr(*b.clone(), env.clone()), env)
+                ),
+                CondType::And => println!(
+                    "{}",
+                    eval_expr(*a.clone(), env.clone()).logical_and(eval_expr(*b.clone(), env))
+                ),
             },
-            _ => println!("{self}")
+            _ => println!("{self}"),
         }
     }
 }
@@ -373,7 +480,8 @@ impl Display for Value {
             Value::Range(s, e) => write!(f, "range<{}, {}>", s, e),
             Value::Counter(ident, s, e) => write!(f, "counter<{}, {}, {}>", ident, s, e),
             Value::RefValue(r) => write!(f, "{:?}", r),
-            _ => write!(f, "Not printable")
+            Value::Float(f64) => write!(f, "{}", f64),
+            _ => write!(f, "Not printable"),
         }
     }
 }

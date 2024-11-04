@@ -32,8 +32,8 @@ impl Function {
             body,
         }
     }
-    pub(crate) fn run(&mut self) -> Value {
-        for stmt in self.body.clone() {
+    pub(crate) fn run(mut self) -> Value {
+        for stmt in self.body {
             match stmt {
                 Stmt::Expr(expr) => match *expr {
                     Expr::Call(call_expr) => {

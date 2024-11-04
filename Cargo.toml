@@ -17,6 +17,13 @@ criterion = { version = "0.5", features = ["html_reports"] }
 [build-dependencies]
 lalrpop = "0.22.0"
 
+[profile.release]
+opt-level = 3
+lto = true
+debug = false
+codegen-units = 1
+
+
 [dependencies]
 lalrpop-util = {version = "0.22.0", features = ["lexer"]}
 anyhow = "1.0.90"

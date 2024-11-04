@@ -16,7 +16,7 @@ pub enum CondType {
     Ge,
     Le,
     Or,
-    And
+    And,
 }
 
 impl CondType {
@@ -33,12 +33,24 @@ impl CondType {
             CondType::Lt => eval_expr(*lhs, env.clone()) < eval_expr(*rhs, env.clone()),
             CondType::Ge => eval_expr(*lhs, env.clone()) >= eval_expr(*rhs, env.clone()),
             CondType::Le => eval_expr(*lhs, env.clone()) <= eval_expr(*rhs, env.clone()),
-            CondType::Or => if let Value::Bool(b) = eval_expr(*lhs, env.clone()).logical_or(eval_expr(*rhs, env.clone()), env) {
-                b
-            } else { panic!("Expected bool type") }
-            CondType::And => if let Value::Bool(b) = eval_expr(*lhs, env.clone()).logical_and(eval_expr(*rhs, env.clone())) {
-                b
-            } else { panic!("Expected bool type") }
+            CondType::Or => {
+                if let Value::Bool(b) =
+                    eval_expr(*lhs, env.clone()).logical_or(eval_expr(*rhs, env.clone()), env)
+                {
+                    b
+                } else {
+                    panic!("Expected bool type")
+                }
+            }
+            CondType::And => {
+                if let Value::Bool(b) =
+                    eval_expr(*lhs, env.clone()).logical_and(eval_expr(*rhs, env.clone()))
+                {
+                    b
+                } else {
+                    panic!("Expected bool type")
+                }
+            }
         }
     }
 }
@@ -339,7 +351,7 @@ impl Value {
             Value::Counter(ident, s, e) => Value::Type(format!("counter<{}, {}, {}>", ident, s, e)),
             Value::Cond(_, _, _) => Value::Type("bool".into()),
             Value::RefValue(r) => r.try_read().unwrap().clone().into_type(),
-            Value::Float(_) => Value::Type("float".into())
+            Value::Float(_) => Value::Type("float".into()),
         }
     }
 
@@ -415,7 +427,8 @@ impl Value {
                 ),
                 CondType::Or => print!(
                     "{}",
-                    eval_expr(*a.clone(), env.clone()).logical_or(eval_expr(*b.clone(), env.clone()), env)
+                    eval_expr(*a.clone(), env.clone())
+                        .logical_or(eval_expr(*b.clone(), env.clone()), env)
                 ),
                 CondType::And => print!(
                     "{}",
@@ -454,7 +467,8 @@ impl Value {
                 ),
                 CondType::Or => println!(
                     "{}",
-                    eval_expr(*a.clone(), env.clone()).logical_or(eval_expr(*b.clone(), env.clone()), env)
+                    eval_expr(*a.clone(), env.clone())
+                        .logical_or(eval_expr(*b.clone(), env.clone()), env)
                 ),
                 CondType::And => println!(
                     "{}",

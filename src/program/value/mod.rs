@@ -69,7 +69,7 @@ pub enum Value {
     Range(i64, i64),
     Counter(String, i64, i64),
     Cond(CondType, Box<Expr>, Box<Expr>),
-    None,
+    Void,
 }
 
 impl Neg for Value {
@@ -81,9 +81,9 @@ impl Neg for Value {
             Value::RefValue(r) => {
                 let mut value = r.try_write().unwrap();
                 *value = -value.clone();
-                Value::None
+                Value::Void
             }
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -98,9 +98,9 @@ impl Not for Value {
             Value::RefValue(r) => {
                 let mut value = r.try_write().unwrap();
                 *value = !value.clone();
-                Value::None
+                Value::Void
             }
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -149,28 +149,28 @@ impl Add for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a + b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a + b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
             (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
                 Value::Float(a) => Value::Float(a + b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Float(b) => Value::Float(a + b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -183,28 +183,28 @@ impl Sub for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a - b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a - b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
             (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
                 Value::Float(a) => Value::Float(a - b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Float(b) => Value::Float(a - b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -218,27 +218,27 @@ impl Mul for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a * b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a * b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
             (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
                 Value::Float(a) => Value::Float(a * b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Float(b) => Value::Float(a * b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -252,27 +252,27 @@ impl Div for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a / b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a / b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
             (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
                 Value::Float(a) => Value::Float(a / b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Float(b) => Value::Float(a / b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -286,27 +286,27 @@ impl Rem for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a % b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a % b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a % b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
             (Value::RefValue(a), Value::Float(b)) => match a.try_read().unwrap().clone() {
                 Value::Float(a) => Value::Float(a % b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Float(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Float(b) => Value::Float(a % b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -320,18 +320,18 @@ impl BitXor for Value {
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Int(a), Value::Int(b)) => Value::Int(a ^ b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::RefValue(a), Value::Int(b)) => match a.try_read().unwrap().clone() {
                 Value::Int(a) => Value::Int(a ^ b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Int(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Int(b) => Value::Int(a ^ b),
-                _ => Value::None,
+                _ => Value::Void,
             },
-            _ => Value::None,
+            _ => Value::Void,
         }
     }
 }
@@ -344,7 +344,7 @@ impl Value {
             Value::FuncPtr(func) => Value::Type(format!("{:?}", func)),
             Value::Func(Function { rty, .. }) => Value::Type(rty),
             Value::Type(ty) => Value::Type(ty),
-            Value::None => Value::Type("none".into()),
+            Value::Void => Value::Type("none".into()),
             Value::Bool(_) => Value::Type("bool".into()),
             Value::CallFunc { .. } => Value::Type("func".into()),
             Value::Range(s, e) => Value::Type(format!("range<{}, {}>", s, e)),
@@ -360,16 +360,16 @@ impl Value {
             (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
             (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
                 Value::Bool(a) => Value::Bool(a || b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Bool(b) => Value::Bool(a || b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(a || b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (Value::Cond(ty1, l1, r1), Value::Cond(ty2, l2, r2)) => Value::Bool(
@@ -383,16 +383,16 @@ impl Value {
             (Value::Bool(a), Value::Bool(b)) => Value::Bool(a && b),
             (Value::RefValue(a), Value::Bool(b)) => match a.try_read().unwrap().clone() {
                 Value::Bool(a) => Value::Bool(a && b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::Bool(a), Value::RefValue(b)) => match b.try_read().unwrap().clone() {
                 Value::Bool(b) => Value::Bool(a && b),
-                _ => Value::None,
+                _ => Value::Void,
             },
             (Value::RefValue(a), Value::RefValue(b)) => {
                 match (a.try_read().unwrap().clone(), b.try_read().unwrap().clone()) {
                     (Value::Bool(a), Value::Bool(b)) => Value::Bool(a && b),
-                    _ => Value::None,
+                    _ => Value::Void,
                 }
             }
             (_, _) => panic!("Expected bool type"),
@@ -486,7 +486,7 @@ impl Display for Value {
             Value::String(s) => write!(f, "{s}"),
             Value::Int(i) => write!(f, "{i}"),
             Value::Func(func) => write!(f, "{}", func.get_ident()),
-            Value::None => write!(f, "None"),
+            Value::Void => write!(f, "None"),
             Value::FuncPtr(func_ptr) => write!(f, "{:?}", func_ptr),
             Value::Type(ty) => write!(f, "{}", ty),
             Value::Bool(b) => write!(f, "{}", b),

@@ -93,7 +93,7 @@ impl Function {
                 _ => panic!("Unhandled statement"),
             };
         }
-        Value::None
+        Value::Void
     }
 
     pub(crate) fn get_ident(&self) -> &str {

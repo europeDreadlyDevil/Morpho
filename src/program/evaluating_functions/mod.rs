@@ -41,7 +41,7 @@ pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
 
 macro_rules! eval_primitive_expr {
         ($rhs: expr, $lhs: expr, $v: expr) => {
-            if let Value::None = $rhs {
+            if let Value::Void = $rhs {
                 $rhs = $v;
             } else {
                 $lhs = $v;
@@ -53,14 +53,14 @@ macro_rules! eval_binary_expr {
         ($rhs: expr, $lhs: expr, $op: tt) => {
             {
                 $rhs = $lhs $op $rhs;
-                $lhs = Value::None
+                $lhs = Value::Void
             }
         };
     }
 
 macro_rules! eval_cond_expr {
         ($rhs: expr, $lhs: expr, $l: expr, $r: expr, $cond_type: expr) => {
-            if let Value::None = $rhs {
+            if let Value::Void = $rhs {
                 $rhs = Value::Cond($cond_type, $l, $r);
             } else {
                 $lhs = Value::Cond($cond_type, $l, $r);
@@ -98,9 +98,9 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
     //println!("EXPR_STACK: {expr_stack:#?}");
 
 
-    let mut value = Value::None;
-    let mut rhs = Value::None;
-    let mut lhs = Value::None;
+    let mut value = Value::Void;
+    let mut rhs = Value::Void;
+    let mut lhs = Value::Void;
     while let Some(expr) = expr_stack.pop() {
         //println!("LHS: {lhs} RHS: {rhs}");
         match expr {
@@ -121,14 +121,14 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
             Expr::Or(l, r) => eval_cond_expr!(rhs, lhs, l, r, CondType::Or),
             Expr::And(l, r) => eval_cond_expr!(rhs, lhs, l, r, CondType::And),
             Expr::Not(_) => {
-                if let Value::None = rhs {
+                if let Value::Void = rhs {
                     lhs = lhs.not()
                 } else {
                     rhs = rhs.not()
                 }
             }
             Expr::Neg(_) => {
-                if let Value::None = rhs {
+                if let Value::Void = rhs {
                     lhs = lhs.neg()
                 } else {
                     rhs = rhs.neg()
@@ -143,7 +143,7 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
                 };
                 let resolved_value = var_value.try_read().unwrap().clone();
 
-                if let Value::None = rhs {
+                if let Value::Void = rhs {
                     rhs = resolved_value;
                 } else {
                     lhs = resolved_value;

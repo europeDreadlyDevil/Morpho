@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use func_lang::parser::ProgParser;
-use func_lang::program::evaluating_functions::eval_program;
+use morpho_c::parser::ProgParser;
+use morpho_c::program::evaluating_functions::eval_program;
 
 fn bench_for_block_with_anon_func(c: &mut Criterion) {
     let ast = ProgParser::new()

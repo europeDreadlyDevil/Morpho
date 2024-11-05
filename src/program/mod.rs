@@ -7,7 +7,7 @@ pub mod value;
 use crate::ast::Prog;
 use crate::program::evaluating_functions::extract_func;
 use crate::program::function::Function;
-use crate::program::primitive_functions::{for_func, if_func, print_func};
+use crate::program::primitive_functions::{for_func, if_func, input_func, print_func, while_func};
 use crate::program::value::Value;
 use crate::GLOBAL_ENV;
 use anyhow::{Error, Result};
@@ -31,6 +31,16 @@ impl Program {
             .try_write()
             .unwrap()
             .insert_stmt("for".into(), Value::FuncPtr(for_func));
+        GLOBAL_ENV
+            .try_write()
+            .unwrap()
+            .insert_stmt("while".into(), Value::FuncPtr(while_func));
+        GLOBAL_ENV
+            .try_write()
+            .unwrap()
+            .insert_stmt("input".into(), Value::FuncPtr(input_func));
+
+
         let mut extracted_functions: HashMap<String, Function> = HashMap::new();
 
         for stmt in prog.0 {

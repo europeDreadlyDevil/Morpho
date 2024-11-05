@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use func_lang::parser::ProgParser;
-use func_lang::program::evaluating_functions::eval_program;
+use morpho_c::parser::ProgParser;
+use morpho_c::program::evaluating_functions::eval_program;
 use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::Read;
@@ -24,6 +24,6 @@ struct CLI {
 
 fn main() -> Result<()> {
     let ast = ProgParser::new().parse(&CODE)?;
-    println!("{ast:?}");
+    //println!("{ast:?}");
     eval_program(ast)
 }

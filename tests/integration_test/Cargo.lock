@@ -220,22 +220,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
-name = "func_lang"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "lalrpop",
- "lalrpop-util",
- "lazy_static",
- "tracing",
- "tracing-log",
- "tracing-subscriber",
- "trees",
- "uuid",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -292,7 +276,7 @@ name = "integration_test"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "func_lang",
+ "morpho_c",
  "tracing",
  "tracing-log",
  "tracing-subscriber",
@@ -367,6 +351,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e9489c2807c139ffd9c1794f4af0ebe86a828db53ecdc7fea2111d0fed085d1"
 
 [[package]]
+name = "libloading"
+version = "0.8.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
+dependencies = [
+ "cfg-if",
+ "windows-targets",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,6 +381,22 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
+
+[[package]]
+name = "morpho_c"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "lalrpop",
+ "lalrpop-util",
+ "lazy_static",
+ "libloading",
+ "tracing",
+ "tracing-log",
+ "tracing-subscriber",
+ "uuid",
+]
 
 [[package]]
 name = "new_debug_unreachable"
@@ -690,12 +700,6 @@ dependencies = [
  "tracing-core",
  "tracing-log",
 ]
-
-[[package]]
-name = "trees"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0de5f738ceab88e2491a94ddc33c3feeadfa95fedc60363ef110845df12f3878"
 
 [[package]]
 name = "typenum"

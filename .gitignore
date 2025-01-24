@@ -1,3 +1,7 @@
 /target
 .idea
 tests/integration_test/target
+main.fn
+tests/unit/unit.test.rs
+Cargo.lock
+tests/integration_test/Cargo.lock

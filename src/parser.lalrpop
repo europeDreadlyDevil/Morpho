@@ -2,33 +2,47 @@ use crate::ast::*;
 
 grammar;
 
+
+
 pub Prog: Prog = {
     <stmt: Stmt*> => Prog(stmt)
 }
 
 pub Stmt: Stmt = {
+    <comment: Comment> => Stmt::Comment(comment),
     <func: FuncIdent> => Stmt::FuncIdent(func),
     <var: VarIdent> ";" => Stmt::VarIdent(var),
     <assign: VarAssign> ";" => Stmt::VarAssign(assign),
     "return" <expr: Expr> ";" => Stmt::ReturnValue(Box::new(expr)),
+    "mod" <id: Ident> <body: Body> => Stmt::Module(Module::new(id, body)),
+    "use" <import: PrimitiveExpr> ";" => Stmt::Import(Import::new(Box::new(import))),
     <expr: Expr> ";" => Stmt::Expr(Box::new(expr)),
 };
+
+Comment: String = {
+    <c: r"//[^\n]*\n"> => c.to_string(),
+    //<c:"/\\*([^*]|\\*+[^*/])*\\*+/"> => c.to_string(),
+}
 
 VarAssign: VarAssign = {
     <ident: Ident> "=" <expr: Expr> => VarAssign::new(ident, expr),
 }
 
 FuncIdent: FuncIdent = {
-    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" <body: FuncBody>
-        => FuncIdent::new_wo_rty(&id, args, Some(body)),
-    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" "->" <rtype: Type> <body: FuncBody>
-        => FuncIdent::new_w_rty(&id, args, rtype, Some(body)),
+    "pub" "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" <body: Body>
+        => FuncIdent::new_wo_rty(PrivacyType::Public, &id, args, Some(body)),
+    "pub" "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" "->" <rtype: Type> <body: Body>
+        => FuncIdent::new_w_rty(PrivacyType::Public, &id, args, rtype, Some(body)),
+    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" <body: Body>
+        => FuncIdent::new_wo_rty(PrivacyType::Private, &id, args, Some(body)),
+    "func" <id: Ident> "=" "(" <args: Comma<Arg>> ")" "->" <rtype: Type> <body: Body>
+        => FuncIdent::new_w_rty(PrivacyType::Private, &id, args, rtype, Some(body)),
 };
 
 AnonymousFunc: AnonymousFunc = {
-    "$|" <args: Comma<AnonymousFuncArg>> "|" <body: FuncBody>
+    "$|" <args: Comma<AnonymousFuncArg>> "|" <body: Body>
             => AnonymousFunc::new_wo_rty(args, Some(body)),
-    "$|" <args: Comma<AnonymousFuncArg>> "|" "->" <rtype: Type> <body: FuncBody>
+    "$|" <args: Comma<AnonymousFuncArg>> "|" "->" <rtype: Type> <body: Body>
             => AnonymousFunc::new_w_rty(args, rtype, Some(body)),
 }
 
@@ -40,8 +54,8 @@ Arg: (String, String) = {
     <id: Ident> ":" <ty: Type> => (id, ty)
 };
 
-FuncBody: FuncBody = {
-    "{" <stmt: Stmt*> "}" => FuncBody::new(stmt),
+Body: Body = {
+    "{" <stmt: Stmt*> "}" => Body::new(stmt),
 };
 
 VarIdent: VarIdent = {
@@ -106,7 +120,12 @@ PrimitiveExpr: Expr = {
     <range: Range> => Expr::Range(range),
     <anon_func: AnonymousFunc> => Expr::AnonFunc(anon_func),
     "&" <r: PrimitiveExpr> => Expr::Ref(Box::new(r)),
+    InlineAccessExpr,
     "(" <e: Expr> ")" => e,
+}
+
+InlineAccessExpr: Expr = {
+    <id: Ident> "::" <expr: PrimitiveExpr> => Expr::InlineAccess(InlineAccess::new(id, Some(Box::new(expr)))),
 }
 
 Range: (i64, i64) = {
@@ -171,17 +190,14 @@ Comma<T>: Vec<T> = {
     => vec![]
 };
 
-// Массив значений
 pub Array: Vec<Expr> = {
     "[" <items:Comma<Expr>> "]" => items,
 };
 
-// Словарь (ключи — строки, значения — любые выражения)
 pub Dictionary: Vec<(Expr, Expr)> = {
     "{" <entries:Comma<Entry>> "}" => entries,
 };
 
-// Отдельная пара ключ-значение в словаре
 Entry: (Expr, Expr) = {
     <key:StringLit> ":" <value:Expr> => (Expr::StringLit(key), value),
     <key:Ident> ":" <value:Expr> => (Expr::Ident(key), value)

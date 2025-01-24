@@ -17,6 +17,10 @@ impl Environment {
         self.global_stmts
             .insert(ident.into(), Arc::new(RwLock::new(stmt)));
     }
+
+    pub fn insert(&mut self, ident: &str, stmt: Arc<RwLock<Value>>) {
+        self.global_stmts.insert(ident.into(), stmt);
+    }
 }
 
 #[derive(Clone, Debug)]

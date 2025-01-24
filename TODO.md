@@ -1,7 +1,0 @@
-- [x] Parsing vars and basic implemented funcs
-- [x] Func recursion and base print
-- [x] Conditional branches
-- [X] Eq (==, <, >, <=, >=)
-- [x] XOR, MOD, logical operation (&&, ||, !)
-- [ ] Loops blocks (for, while, loop)
-- [ ] Func like structures with fields

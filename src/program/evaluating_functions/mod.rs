@@ -1,4 +1,4 @@
-use crate::ast::{CallExpr, Expr, FuncBody, Prog, Stmt};
+use crate::ast::{CallExpr, Expr, Body, Prog, Stmt, PrivacyType, Import, InlineAccess};
 use crate::program::environment::LocalEnvironment;
 use crate::program::function::Function;
 use crate::program::value::{CondType, Value};
@@ -7,8 +7,9 @@ use crate::{ANON_FUNC_CACHE, GLOBAL_ENV};
 use std::collections::HashMap;
 use std::ops::{Neg, Not};
 use std::sync::{Arc, RwLock};
-use trees::{Forest, Tree};
 use uuid::Uuid;
+use crate::program::module::Module;
+
 #[inline]
 pub fn eval_program(prog: Prog) -> anyhow::Result<()> {
     let prog = Program::new(prog)?;
@@ -17,13 +18,15 @@ pub fn eval_program(prog: Prog) -> anyhow::Result<()> {
 }
 
 #[inline]
-pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
+pub fn extract_func(func_stmt: &Stmt) -> Option<(String, Function)> {
     match func_stmt {
         Stmt::FuncIdent(f_ident) => {
-            if let Some(FuncBody { stmt }) = f_ident.stmt {
+            let f_ident = f_ident.clone();
+            if let Some(Body { stmt }) = f_ident.stmt {
                 return Some((
                     f_ident.ident.clone(),
                     Function::new(
+                        f_ident.privacy_type,
                         HashMap::new(),
                         Arc::new(RwLock::new(LocalEnvironment::new())),
                         f_ident.ident,
@@ -33,6 +36,66 @@ pub fn extract_func(func_stmt: Stmt) -> Option<(String, Function)> {
                     ),
                 ));
             }
+        }
+        _ => {}
+    }
+    None
+}
+
+pub fn extract_module(mod_stmt: &Stmt) -> Option<(String, Module)> {
+    match mod_stmt {
+        Stmt::Module(module_ident) => {
+            let mut module = Module::new(&module_ident.ident);
+            let mut extracted_functions = HashMap::new();
+            let mut extracted_modules = HashMap::new();
+            for stmt in &module_ident.body.stmt {
+                if let Some((ident, module)) = extract_module(stmt) {
+                    extracted_modules.insert(ident, module);
+                }
+                if let Some((ident, func)) = extract_func(stmt) {
+                   extracted_functions.insert(ident, func);
+                }
+            }
+            for (ident, m) in extracted_modules {
+                module.insert(&ident, Value::Module(m));
+            }
+            for (ident, func) in extracted_functions {
+                module.insert(&ident, Value::Func(func));
+            }
+            Some((module_ident.ident.clone(), module))
+        }
+        _ => None
+    }
+}
+
+pub fn extract_import(import_stmt: &Stmt, ) -> Option<(String, Arc<RwLock<Value>>)> {
+    match import_stmt {
+        Stmt::Import(Import{ inline_access }) => {
+            let mut idents = vec![];
+            let mut curr_expr = Some(inline_access.clone());
+            while let Some(expr) = curr_expr {
+                match *expr {
+                    Expr::InlineAccess(InlineAccess { ident, next }) => {
+                        idents.push(ident);
+                        curr_expr = next;
+                    }
+                    Expr::Ident(ident) => {
+                        idents.push(ident);
+                        curr_expr = None;
+                    }
+                    _ => {
+                        curr_expr = None;
+                    }
+                }
+            }
+            let mut curr_stmt = GLOBAL_ENV.read().unwrap().global_stmts.get(&idents[1]).unwrap().clone();
+            for i in 2..idents.len() {
+                let module = if let Value::Module(module) = curr_stmt.read().unwrap().clone() {
+                    module
+                } else { panic!("Module not found!") };
+                curr_stmt = module.get(&idents[i]).unwrap().clone();
+            }
+            return Some((idents[idents.len()-1].clone(), curr_stmt))
         }
         _ => {}
     }
@@ -171,6 +234,7 @@ pub fn eval_expr(expr: Expr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
 
 
                         let func = Function::new(
+                            PrivacyType::Private,
                             HashMap::new(),
                             Arc::clone(&env),
                             ident.clone(),
@@ -289,6 +353,7 @@ macro_rules! macro_extract_func {
 
 #[inline]
 pub fn call_func(call_expr: CallExpr, env: Arc<RwLock<LocalEnvironment>>) -> Value {
+    //println!("{call_expr:?} {env:?}");
     let ident = call_expr.get_name();
     match GLOBAL_ENV
         .try_read()

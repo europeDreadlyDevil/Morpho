@@ -1,4 +1,3 @@
-use std::io::Read;
 use crate::program::environment::LocalEnvironment;
 use crate::program::evaluating_functions::{call_func, eval_expr};
 use crate::program::value::Value;
@@ -10,7 +9,7 @@ pub fn print_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value
     for i in 0..args.len() - 1 {
         args[i].print(env.clone())
     }
-    args[args.len() - 1].print(env);
+    args[args.len() - 1].println(env);
     Value::Void
 }
 
@@ -149,8 +148,7 @@ pub fn while_func(args: Vec<Value>, env: Arc<RwLock<LocalEnvironment>>) -> Value
 pub fn input_func(_args: Vec<Value>, _env: Arc<RwLock<LocalEnvironment>>) -> Value {
     let mut input = String::new();
     if let Err(e) = std::io::stdin().read_line(&mut input) {
-        panic!("{e}");
+        panic!("{}",e);
     }
-
     Value::String(input.trim().to_string())
 }

@@ -1,7 +1,7 @@
 use anyhow::Result;
-use func_lang::parser::ProgParser;
+use morpho_c::parser::ProgParser;
 use tracing_log::log::{log, Level};
-use func_lang::program::evaluating_functions::eval_program;
+use morpho_c::program::evaluating_functions::eval_program;
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();

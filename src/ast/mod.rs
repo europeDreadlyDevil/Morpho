@@ -34,6 +34,7 @@ pub enum Expr {
     Neg(Box<Expr>),
     Xor(Box<Expr>, Box<Expr>),
     Mod(Box<Expr>, Box<Expr>),
+    InlineAccess(InlineAccess)
 }
 
 impl PartialEq for Expr {
@@ -74,12 +75,12 @@ impl PartialEq for Expr {
             (Expr::Neg(a), Expr::Neg(b)) => a == b,
             (Expr::Xor(a1,b1 ), Expr::Xor(a2, b2)) => a1 == a2 && b1 == b2,
             (Expr::Mod(a, b), Expr::Mod(c, d)) => a == c && b == d,
+            (Expr::InlineAccess(a), Expr::InlineAccess(b)) => a == b,
             _ => false,
         }
     }
 }
 
-// Implementing the Eq trait
 impl Eq for Expr {}
 
 impl Hash for Expr {
@@ -218,6 +219,10 @@ impl Hash for Expr {
                 lhs.hash(state);
                 rhs.hash(state);
             }
+            Expr::InlineAccess(a) => {
+                state.write_u8(29);
+                a.hash(state)
+            }
         }
     }
 }
@@ -257,11 +262,49 @@ impl CallExpr {
 #[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
 pub enum Stmt {
     FuncIdent(FuncIdent),
-    FuncBody(FuncBody),
+    FuncBody(Body),
     VarIdent(VarIdent),
     VarAssign(VarAssign),
     ReturnValue(Box<Expr>),
     Expr(Box<Expr>),
+    Module(Module),
+    Import(Import),
+    Comment(String),
+}
+
+#[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
+pub struct Import {
+    pub inline_access: Box<Expr>,
+}
+
+impl Import {
+    pub fn new(inline_access: Box<Expr>) -> Self {
+        Self { inline_access }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
+pub struct InlineAccess {
+    pub ident: String,
+    pub next: Option<Box<Expr>>
+}
+
+impl InlineAccess {
+    pub fn new(ident: String, next: Option<Box<Expr>>) -> Self {
+        Self { ident, next }
+    }
+}
+
+#[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
+pub struct Module {
+    pub(crate) ident: String,
+    pub(crate) body: Body
+}
+
+impl Module {
+    pub fn new(ident: String, body: Body) -> Self {
+        Self { ident, body }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
@@ -280,15 +323,15 @@ impl VarAssign {
 pub struct AnonymousFunc {
     pub args: Vec<(String, Expr)>,
     pub rty: String,
-    pub stmt: Option<FuncBody>,
+    pub stmt: Option<Body>,
 }
 
 impl AnonymousFunc {
-    pub fn new_w_rty(args: Vec<(String, Expr)>, rty: String, stmt: Option<FuncBody>) -> Self {
+    pub fn new_w_rty(args: Vec<(String, Expr)>, rty: String, stmt: Option<Body>) -> Self {
         Self { args, stmt, rty }
     }
 
-    pub fn new_wo_rty(args: Vec<(String, Expr)>, stmt: Option<FuncBody>) -> Self {
+    pub fn new_wo_rty(args: Vec<(String, Expr)>, stmt: Option<Body>) -> Self {
         Self {
             args,
             stmt,
@@ -297,22 +340,31 @@ impl AnonymousFunc {
     }
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd)]
+pub enum PrivacyType {
+    Public,
+    Private,
+}
+
 #[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
 pub struct FuncIdent {
+    pub privacy_type: PrivacyType,
     pub ident: String,
     pub args: Vec<(String, String)>,
     pub rty: String,
-    pub stmt: Option<FuncBody>,
+    pub stmt: Option<Body>,
 }
 
 impl FuncIdent {
     pub fn new_w_rty(
+        privacy_type: PrivacyType,
         ident: &str,
         args: Vec<(String, String)>,
         rty: String,
-        stmt: Option<FuncBody>,
+        stmt: Option<Body>,
     ) -> Self {
         Self {
+            privacy_type,
             ident: ident.into(),
             args,
             stmt,
@@ -320,8 +372,9 @@ impl FuncIdent {
         }
     }
 
-    pub fn new_wo_rty(ident: &str, args: Vec<(String, String)>, stmt: Option<FuncBody>) -> Self {
+    pub fn new_wo_rty(privacy_type: PrivacyType, ident: &str, args: Vec<(String, String)>, stmt: Option<Body>) -> Self {
         Self {
+            privacy_type,
             ident: ident.into(),
             args,
             stmt,
@@ -331,11 +384,11 @@ impl FuncIdent {
 }
 
 #[derive(PartialEq, Debug, Clone, PartialOrd, Hash, Eq)]
-pub struct FuncBody {
+pub struct Body {
     pub stmt: Vec<Stmt>,
 }
 
-impl FuncBody {
+impl Body {
     pub fn new(stmt: Vec<Stmt>) -> Self {
         Self { stmt }
     }

@@ -1,12 +1,14 @@
-use crate::ast::{Expr, Stmt, VarAssign, VarIdent};
+use crate::ast::{Expr, InlineAccess, PrivacyType, Stmt, VarAssign, VarIdent};
 use crate::program::environment::LocalEnvironment;
 use crate::program::evaluating_functions::{call_func, eval_expr};
 use crate::program::value::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use crate::GLOBAL_ENV;
 
 #[derive(Clone, Debug)]
 pub struct Function {
+    privacy: PrivacyType,
     function_fields: HashMap<String, Value>,
     environment: Arc<RwLock<LocalEnvironment>>,
     ident: String,
@@ -16,6 +18,7 @@ pub struct Function {
 }
 impl Function {
     pub fn new(
+        privacy: PrivacyType,
         function_fields: HashMap<String, Value>,
         environment: Arc<RwLock<LocalEnvironment>>,
         ident: String,
@@ -24,6 +27,7 @@ impl Function {
         body: Vec<Stmt>,
     ) -> Self {
         Self {
+            privacy,
             function_fields,
             environment,
             ident,
@@ -38,6 +42,47 @@ impl Function {
                 Stmt::Expr(expr) => match *expr {
                     Expr::Call(call_expr) => {
                         call_func(call_expr, self.environment.clone());
+                    }
+                    Expr::InlineAccess(InlineAccess{ ident, next }) => {
+                        let mut idents = vec![ident];
+                        let mut curr_expr = next;
+                        while let Some(expr) = curr_expr.clone() {
+                            match *expr {
+                                Expr::InlineAccess(InlineAccess{ident, next}) => {
+                                    idents.push(ident);
+                                    curr_expr = next;
+                                }
+                                Expr::Call(call_expr) => {
+                                    let mut module_value = GLOBAL_ENV.read().unwrap().global_stmts.get(&idents[0]).unwrap().clone();
+                                    let mut deleted_func = None;
+                                    let mut inserted_ident = call_expr.get_name();
+                                    //println!("MODULE:{module_value:?}");
+                                    for i in 1..idents.len() {
+                                        let module = if let Value::Module(val) = module_value.read().unwrap().clone() {
+                                            val
+                                        } else { panic!("Module not found") };
+                                        module_value = module.get(&idents[i]).unwrap().clone();
+                                    }
+                                    if let Value::Module(module) = module_value.read().unwrap().clone() {
+                                        if let Some(func_value) = module.get(&inserted_ident) {
+                                            if let Value::Func(func) = func_value.clone().read().unwrap().clone() {
+                                                deleted_func = GLOBAL_ENV.write().unwrap().global_stmts.insert(inserted_ident.clone(), Arc::new(RwLock::new(Value::Func(func))));
+                                            }
+                                        }
+                                    }
+
+                                    //println!("SELF_ENV: {:?}", self.environment);
+                                    call_func(call_expr, self.environment.clone());
+                                    if let Some(value) = deleted_func {
+                                        GLOBAL_ENV.write().unwrap().global_stmts.insert(inserted_ident, value);
+                                    } else {
+                                        GLOBAL_ENV.write().unwrap().global_stmts.remove(&inserted_ident);
+                                    }
+                                    curr_expr = None;
+                                }
+                                _ => panic!("Unhandled expression"),
+                            }
+                        }
                     }
                     _ => panic!("Unhandled expression"),
                 },

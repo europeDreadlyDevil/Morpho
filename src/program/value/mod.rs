@@ -5,7 +5,9 @@ use crate::program::function::Function;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Add, BitOr, BitXor, Div, Mul, Neg, Not, Rem, Sub};
+use std::ptr::fn_addr_eq;
 use std::sync::{Arc, RwLock};
+use crate::program::module::Module;
 
 #[derive(Clone, Debug)]
 pub enum CondType {
@@ -70,6 +72,7 @@ pub enum Value {
     Counter(String, i64, i64),
     Cond(CondType, Box<Expr>, Box<Expr>),
     Void,
+    Module(Module),
 }
 
 impl Neg for Value {
@@ -133,7 +136,7 @@ impl PartialEq for Value {
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Int(a), Value::Int(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
-            (Value::FuncPtr(a), Value::FuncPtr(b)) => a == b,
+            (Value::FuncPtr(a), Value::FuncPtr(b)) => fn_addr_eq(*a, *b),
             (Value::Type(a), Value::Type(b)) => a == b,
             (Value::Func(a), Value::Func(b)) => a.rty == b.rty,
             (_, _) => false,
@@ -352,6 +355,7 @@ impl Value {
             Value::Cond(_, _, _) => Value::Type("bool".into()),
             Value::RefValue(r) => r.try_read().unwrap().clone().into_type(),
             Value::Float(_) => Value::Type("float".into()),
+            Value::Module(_) => Value::Type("module".into()),
         }
     }
 
